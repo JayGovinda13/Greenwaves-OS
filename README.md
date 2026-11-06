@@ -26,6 +26,7 @@ Sistema de gestão (SaaS multi-tenant) da produtora **Green Wave** — booking, 
 ```bash
 cp .env.example .env   # defina AUTH_SECRET (openssl rand -base64 32)
 npm install
+npm run db:up          # Postgres local via Docker
 npm run db:push
 npm run db:seed
 npm run dev
@@ -41,8 +42,12 @@ O import é idempotente e lê as abas *Shows*, *Shows 2027*, *Dados das bandas*,
 
 > Dados pessoais (RG, CPF, telefones) **não** são versionados: o seed do repositório (`prisma/data/seed-workbook.json`) é uma versão sanitizada gerada com `npm run import:xlsx -- data/greenwave.xlsx --export-sanitized prisma/data/seed-workbook.json`.
 
-## Produção
-Troque `provider = "sqlite"` por `"postgresql"` em `prisma/schema.prisma`, aponte `DATABASE_URL` para o Postgres e rode `npx prisma migrate deploy` (ou `db push`). Defina um `AUTH_SECRET` forte.
+## Deploy no Vercel
+1. **Banco:** no projeto do Vercel, *Storage → Create Database → Neon (Postgres)* e conecte ao projeto. Isso cria `DATABASE_URL` automaticamente.
+2. **Segredo:** *Settings → Environment Variables* → `AUTH_SECRET` com um valor aleatório longo (`openssl rand -base64 32`), em Production e Preview.
+3. **Redeploy.** O script `vercel-build` gera o Prisma Client e cria/atualiza as tabelas (`prisma db push`) antes do `next build`.
+4. Abra `https://SEU-APP.vercel.app/api/health` — deve responder `"ok": true`.
+5. Crie a conta da produtora em `/cadastro` e importe a planilha em *Configurações → Importar planilha*. (Alternativa: rodar `npm run db:seed` localmente com `DATABASE_URL` do Neon e `SEED_PASSWORD` definido.)
 
 ## Estrutura
 ```

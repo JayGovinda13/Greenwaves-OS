@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { SESSION_COOKIE, verifySession } from '@/lib/session';
 
-const PUBLIC = ['/login', '/cadastro'];
+const PUBLIC = ['/login', '/cadastro', '/api/health'];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -14,7 +14,7 @@ export async function middleware(req: NextRequest) {
     url.search = pathname === '/' ? '' : `?next=${encodeURIComponent(pathname)}`;
     return NextResponse.redirect(url);
   }
-  if (session && isPublic) {
+  if (session && (pathname.startsWith('/login') || pathname.startsWith('/cadastro'))) {
     const url = req.nextUrl.clone();
     url.pathname = '/dashboard';
     url.search = '';

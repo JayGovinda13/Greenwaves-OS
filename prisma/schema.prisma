@@ -3,11 +3,11 @@
 // consultada com filtro por organizationId (ver src/lib/tenant.ts).
 //
 // Valores monetários são armazenados em centavos (Int) para evitar erros de ponto flutuante.
-// Campos de "enum" são String validados com zod (src/lib/domain.ts) para manter
-// compatibilidade entre SQLite (dev) e PostgreSQL (produção).
+// Campos de "enum" são String validados com zod (src/lib/domain.ts).
+// Banco: PostgreSQL (local via docker-compose; produção via Neon/Vercel Marketplace).
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

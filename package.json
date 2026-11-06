@@ -5,7 +5,7 @@
   "description": "Greenwaves OS — sistema de gestão para a produtora Green Wave (booking, shows, casting, CRM e financeiro).",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -14,7 +14,9 @@
     "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "import:xlsx": "tsx scripts/import-xlsx.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate && prisma db push --skip-generate && next build",
+    "db:up": "docker compose up -d db"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

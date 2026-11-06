@@ -26,7 +26,19 @@ const loginSchema = z.object({
   next: z.string().optional(),
 });
 
-export async function login(_: AuthState, fd: FormData): Promise<AuthState> {
+const CONFIG_ERROR = 'Servidor sem configuração: verifique DATABASE_URL e AUTH_SECRET (veja /api/health).';
+
+export async function login(state: AuthState, fd: FormData): Promise<AuthState> {
+  try {
+    return await doLogin(state, fd);
+  } catch (e) {
+    if (e && typeof e === 'object' && 'digest' in e) throw e; // redirect()
+    console.error('[login]', e);
+    return { error: CONFIG_ERROR, values: keep(fd) };
+  }
+}
+
+async function doLogin(_: AuthState, fd: FormData): Promise<AuthState> {
   const parsed = loginSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { error: parsed.error.issues[0]!.message, values: keep(fd) };
   const { email, password, next } = parsed.data;
@@ -49,7 +61,17 @@ const signupSchema = z.object({
   password: z.string().min(8, 'A senha precisa ter ao menos 8 caracteres'),
 });
 
-export async function signup(_: AuthState, fd: FormData): Promise<AuthState> {
+export async function signup(state: AuthState, fd: FormData): Promise<AuthState> {
+  try {
+    return await doSignup(state, fd);
+  } catch (e) {
+    if (e && typeof e === 'object' && 'digest' in e) throw e; // redirect()
+    console.error('[signup]', e);
+    return { error: CONFIG_ERROR, values: keep(fd) };
+  }
+}
+
+async function doSignup(_: AuthState, fd: FormData): Promise<AuthState> {
   const parsed = signupSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { error: parsed.error.issues[0]!.message, values: keep(fd) };
   const { name, orgName, email, password } = parsed.data;
