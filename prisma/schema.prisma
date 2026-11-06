@@ -1,0 +1,243 @@
+// Greenwaves OS — modelo de dados multi-tenant.
+// Toda entidade de negócio pertence a uma Organization (tenant) e é sempre
+// consultada com filtro por organizationId (ver src/lib/tenant.ts).
+//
+// Valores monetários são armazenados em centavos (Int) para evitar erros de ponto flutuante.
+// Campos de "enum" são String validados com zod (src/lib/domain.ts) para manter
+// compatibilidade entre SQLite (dev) e PostgreSQL (produção).
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("PRO") // FREE | PRO | ENTERPRISE
+  email     String?
+  phone     String?
+  instagram String?
+  city      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships  Membership[]
+  artists      Artist[]
+  shows        Show[]
+  contacts     Contact[]
+  transactions Transaction[]
+  activities   Activity[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships Membership[]
+  activities  Activity[]
+  showsOwned  Show[]       @relation("ShowOwner")
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  role           String       @default("PRODUCER") // OWNER | ADMIN | PRODUCER | VIEWER
+  userId         String
+  organizationId String
+  createdAt      DateTime     @default(now())
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model Artist {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  instagram      String?
+  originCity     String?
+  originState    String?
+  genres         String? // separado por vírgula
+  bio            String?
+  latestRelease  String?
+  label          String?
+  mediaKitUrl    String?
+  riderUrl       String?
+  photosUrl      String?
+  settlementUrl  String? // planilha de fechamento
+  baseFee        Int? // cachê de referência (centavos)
+  accent         String   @default("green") // green | lime | cream (estilo do card)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      ArtistMember[]
+  shows        Show[]
+  transactions Transaction[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+// "Dados das bandas": integrantes e equipe técnica de cada artista
+model ArtistMember {
+  id           String    @id @default(cuid())
+  artistId     String
+  name         String
+  role         String?
+  birthDate    DateTime?
+  documentRg   String?
+  documentCpf  String?
+  phone        String?
+  email        String?
+  restrictions String? // preferências/restrições alimentares, rider pessoal etc.
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@index([artistId])
+}
+
+// Contratantes, casas de show, festivais e coletivos
+model Contact {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  company        String? // Casa / Fest / Coletivo
+  kind           String   @default("VENUE") // VENUE | FESTIVAL | COLLECTIVE | PRODUCER | PRESS | SUPPLIER | OTHER
+  region         String?
+  state          String?
+  city           String?
+  phone          String?
+  email          String?
+  instagram      String?
+  link           String?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shows        Show[]
+
+  @@index([organizationId])
+  @@index([organizationId, state])
+}
+
+model Show {
+  id             String   @id @default(cuid())
+  organizationId String
+  artistId       String
+  contactId      String?
+  ownerId        String?
+  date           DateTime
+  city           String?
+  state          String?
+  venue          String?
+  venueUrl       String? // link do mapa da casa
+  eventName      String?
+  status         String   @default("CONFIRMED") // PROSPECT | NEGOTIATING | CONFIRMED | DONE | CANCELED
+  contactName    String? // contato livre quando não há Contact cadastrado
+
+  // Combinado (deal)
+  dealType    String  @default("FIXED") // FIXED | DOOR | GUARANTEE_OR_DOOR | FREE | TBD
+  fee         Int? // cachê/garantia em centavos
+  doorPercent Int? // % de bilheteria
+  dealNotes   String? // texto original do combinado
+  hospitality String? // extras: hospedagem, alimentação, backline, aéreos...
+
+  // Bilheteria / divulgação
+  ticketUrl   String?
+  ticketsSold Int?
+  capacity    Int?
+  ticketPrice Int? // centavos
+  posterUrl   String?
+  socialUrl   String?
+
+  // Pré-produção e logística
+  techSheetUrl String? // ficha técnica / caderno técnico
+  travel       String? // passagens
+  lodging      String? // hospedagem
+  crewList     String? // lista de equipe
+  guestList    String? // lista de convidados
+  notes        String?
+
+  // Checklist de produção
+  chkPoster    Boolean @default(false)
+  chkTickets   Boolean @default(false)
+  chkTechSheet Boolean @default(false)
+  chkSocial    Boolean @default(false)
+  chkTravel    Boolean @default(false)
+  chkLodging   Boolean @default(false)
+  chkCrewList  Boolean @default(false)
+  chkGuests    Boolean @default(false)
+  chkSettled   Boolean @default(false) // fechamento/acerto realizado
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  artist       Artist        @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  owner        User?         @relation("ShowOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  transactions Transaction[]
+
+  @@index([organizationId, date])
+  @@index([artistId])
+}
+
+// Lançamentos financeiros: cachês a receber, comissões, despesas (cartão Green Wave), repasses
+model Transaction {
+  id             String    @id @default(cuid())
+  organizationId String
+  showId         String?
+  artistId       String?
+  type           String // INCOME | EXPENSE
+  category       String // FEE | COMMISSION | TICKETING | TRAVEL | LODGING | FOOD | BACKLINE | MARKETING | CARD | PAYOUT | OTHER
+  description    String
+  amount         Int // centavos, sempre positivo
+  date           DateTime
+  dueDate        DateTime?
+  status         String    @default("PENDING") // PENDING | PAID | CANCELED
+  method         String? // PIX | CARD | TRANSFER | CASH | BOLETO
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  show         Show?        @relation(fields: [showId], references: [id], onDelete: SetNull)
+  artist       Artist?      @relation(fields: [artistId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, date])
+}
+
+// Trilha de auditoria
+model Activity {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  action         String // created | updated | deleted | imported ...
+  entity         String // show | artist | contact | transaction | member ...
+  entityId       String?
+  summary        String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+}
