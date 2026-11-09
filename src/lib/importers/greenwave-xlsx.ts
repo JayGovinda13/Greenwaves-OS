@@ -53,7 +53,22 @@ export interface ImportedContact {
   link: string | null;
   notes: string | null;
 }
+export interface ImportedArtist {
+  name: string;
+  instagram: string | null;
+  originCity: string | null;
+  originState: string | null;
+  genres: string | null;
+  latestRelease: string | null;
+  label: string | null;
+  bio: string | null;
+  mediaKitUrl: string | null;
+  riderUrl: string | null;
+  photosUrl: string | null;
+  baseFee: number | null; // centavos
+}
 export interface ImportedWorkbook {
+  artists?: ImportedArtist[];
   shows: ImportedShow[];
   members: ImportedMember[];
   contacts: ImportedContact[];
@@ -198,9 +213,31 @@ function parseShowSheet(ws: ExcelJS.Worksheet): ImportedShow[] {
 function parseMembers(ws: ExcelJS.Worksheet): ImportedMember[] {
   const out: ImportedMember[] = [];
   let current: string | null = null;
+  let flat = false;
   ws.eachRow((row) => {
     const a = cellText(row.getCell(1));
     const b = cellText(row.getCell(2));
+    // Formato do modelo: uma linha por pessoa, com a banda na coluna A
+    if (a && b && norm(a) === 'banda' && norm(b) === 'nome') {
+      flat = true;
+      return;
+    }
+    if (flat) {
+      if (!a || !b) return;
+      out.push({
+        artist: a,
+        name: b,
+        role: cellText(row.getCell(3)),
+        birthDate: cellDate(row.getCell(4)),
+        documentRg: cellText(row.getCell(5)),
+        documentCpf: cellText(row.getCell(6)),
+        phone: cellText(row.getCell(7)),
+        email: cellText(row.getCell(8)),
+        restrictions: cellText(row.getCell(9)),
+      });
+      return;
+    }
+    // Formato original: bloco por banda (linha "Banda | Função | ..." seguida dos integrantes)
     if (b && norm(b) === 'funcao') {
       current = a;
       return;
@@ -297,6 +334,15 @@ function parseSettlements(ws: ExcelJS.Worksheet): { artist: string; url: string 
   ws.eachRow((row) => {
     const cell = row.getCell(1);
     const t = cellText(cell);
+    // Formato do modelo: Artista (A) | Link (B)
+    const b = row.getCell(2);
+    const bText = cellText(b);
+    const bUrl = cellLink(b) ?? (bText && /^https?:\/\//.test(bText) ? bText : null);
+    if (t && bUrl) {
+      out.push({ artist: t, url: bUrl });
+      pending = null;
+      return;
+    }
     const url = cellLink(cell) ?? (t && /^https?:\/\//.test(t) ? t : null);
     if (url && pending) {
       out.push({ artist: pending, url });
@@ -306,14 +352,74 @@ function parseSettlements(ws: ExcelJS.Worksheet): { artist: string; url: string 
   return out;
 }
 
+const ARTIST_COLS: Record<string, keyof ImportedArtist> = {
+  nome: 'name',
+  instagram: 'instagram',
+  cidade: 'originCity',
+  uf: 'originState',
+  generos: 'genres',
+  'ultimo lancamento': 'latestRelease',
+  selo: 'label',
+  release: 'bio',
+  'midia kit': 'mediaKitUrl',
+  'rider e mapa de palco': 'riderUrl',
+  'fotos de divulgacao': 'photosUrl',
+  'cache de referencia': 'baseFee',
+};
+
+function parseMoney(t: string | null): number | null {
+  if (!t) return null;
+  const s = t.replace(/[R$\s]/g, '');
+  const n = Number(s.includes(',') ? s.replace(/\./g, '').replace(',', '.') : /^\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g, '') : s);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
+}
+
+function parseArtists(ws: ExcelJS.Worksheet): ImportedArtist[] {
+  let header: Record<number, keyof ImportedArtist> | null = null;
+  const out: ImportedArtist[] = [];
+  ws.eachRow((row) => {
+    if (!header) {
+      const cols: Record<number, keyof ImportedArtist> = {};
+      row.eachCell((cell, col) => {
+        const key = ARTIST_COLS[norm(cellText(cell) ?? '')];
+        if (key) cols[col] = key;
+      });
+      if (Object.values(cols).includes('name')) header = cols;
+      return;
+    }
+    const rec: Partial<Record<keyof ImportedArtist, string | null>> = {};
+    for (const [col, key] of Object.entries(header)) {
+      const cell = row.getCell(Number(col));
+      rec[key] = key.endsWith('Url') ? cellLinkOrText(cell) : cellText(cell);
+    }
+    if (!rec.name) return;
+    out.push({
+      name: rec.name,
+      instagram: rec.instagram ?? null,
+      originCity: rec.originCity ?? null,
+      originState: rec.originState?.toUpperCase() ?? null,
+      genres: rec.genres ?? null,
+      latestRelease: rec.latestRelease ?? null,
+      label: rec.label ?? null,
+      bio: rec.bio ?? null,
+      mediaKitUrl: rec.mediaKitUrl ?? null,
+      riderUrl: rec.riderUrl ?? null,
+      photosUrl: rec.photosUrl ?? null,
+      baseFee: parseMoney(rec.baseFee ?? null),
+    });
+  });
+  return out;
+}
+
 export async function parseGreenWaveWorkbook(input: ArrayBuffer | Buffer): Promise<ImportedWorkbook> {
   const wb = new ExcelJS.Workbook();
   // exceljs aceita Buffer/ArrayBuffer
   await wb.xlsx.load(input as ArrayBuffer);
-  const result: ImportedWorkbook = { shows: [], members: [], contacts: [], settlements: [] };
+  const result: ImportedWorkbook = { artists: [], shows: [], members: [], contacts: [], settlements: [] };
   wb.eachSheet((ws) => {
     const n = norm(ws.name);
-    if (n.startsWith('shows')) result.shows.push(...parseShowSheet(ws));
+    if (n === 'artistas') result.artists!.push(...parseArtists(ws));
+    else if (n.startsWith('shows')) result.shows.push(...parseShowSheet(ws));
     else if (n.includes('dados das bandas')) result.members.push(...parseMembers(ws));
     else if (n === 'contatos') result.contacts.push(...parseContacts(ws));
     else if (n.includes('lista de contatos')) result.contacts.push(...parseEventContacts(ws));
@@ -325,6 +431,7 @@ export async function parseGreenWaveWorkbook(input: ArrayBuffer | Buffer): Promi
 /** Remove dados pessoais sensíveis (para seeds versionados / demos). */
 export function sanitizeWorkbook(data: ImportedWorkbook): ImportedWorkbook {
   return {
+    artists: data.artists ?? [],
     shows: data.shows.map((s) => ({ ...s, contactPhone: null })),
     members: [],
     contacts: data.contacts.map((c) => ({ ...c, phone: null, email: null })),
@@ -335,6 +442,7 @@ export function sanitizeWorkbook(data: ImportedWorkbook): ImportedWorkbook {
 // ---------------- persistência ----------------
 export interface ImportSummary {
   artistsCreated: number;
+  artistsUpdated: number;
   showsCreated: number;
   showsUpdated: number;
   membersCreated: number;
@@ -354,7 +462,7 @@ export async function importIntoOrganization(
   data: ImportedWorkbook,
   today = new Date(),
 ): Promise<ImportSummary> {
-  const summary: ImportSummary = { artistsCreated: 0, showsCreated: 0, showsUpdated: 0, membersCreated: 0, contactsCreated: 0, settlementsLinked: 0 };
+  const summary: ImportSummary = { artistsCreated: 0, artistsUpdated: 0, showsCreated: 0, showsUpdated: 0, membersCreated: 0, contactsCreated: 0, settlementsLinked: 0 };
   const artists = await db.artist.findMany({ where: { organizationId }, select: { id: true, slug: true } });
   const bySlug = new Map(artists.map((a) => [a.slug, a.id]));
 
@@ -367,6 +475,17 @@ export async function importIntoOrganization(
     summary.artistsCreated++;
     bySlug.set(slug, created.id);
     return created.id;
+  }
+
+  // Aba "Artistas": cria ou completa o cadastro (só sobrescreve campos preenchidos na planilha)
+  for (const a of data.artists ?? []) {
+    const existed = bySlug.has(ALIAS.get(slugify(a.name)) ?? slugify(a.name));
+    const id = await artistId(a.name);
+    const { name: _name, ...fields } = a;
+    void _name;
+    const filled = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null && v !== ''));
+    if (Object.keys(filled).length) await db.artist.update({ where: { id }, data: filled });
+    if (existed) summary.artistsUpdated++;
   }
 
   // Contatos primeiro, para vincular aos shows

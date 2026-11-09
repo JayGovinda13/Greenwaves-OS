@@ -9,7 +9,7 @@ import Chip from '@mui/material/Chip';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { Import, UserPlus } from 'iconoir-react';
+import { Download, Import, UserPlus } from 'iconoir-react';
 import { changePassword, changeRole, importWorkbook, inviteMember, removeMember, saveOrganization } from '@/app/(app)/configuracoes/actions';
 import { ROLES, ROLE_LABEL, ROLE_RANK, type Role } from '@/lib/domain';
 import { initials } from '@/lib/format';
@@ -65,9 +65,20 @@ export function SettingsView({ org, members, myRole, canAdmin }: { org: Org; mem
         </Box>
       </Section>
 
-      <Section title="Importar planilha" subtitle="Sincronize a planilha “Green Wave - Geral” (.xlsx): shows, dados das bandas, contatos e fechamentos. Reimportar não duplica registros.">
+      <Section title="Importar planilha" subtitle="Envie a planilha “Green Wave - Geral” ou o modelo do sistema (.xlsx): artistas, shows, dados das bandas, contatos e fechamentos. Reimportar não duplica registros.">
         {canAdmin ? (
           <Box component="form" onSubmit={importForm.submit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ flex: '1 1 220px' }}>
+                <Typography fontWeight={700}>Modelo de planilha</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Abas prontas com instruções, exemplos nos cabeçalhos e lista dos seus artistas.
+                </Typography>
+              </Box>
+              <Button component="a" href="/api/modelo-planilha" variant="contained" color="secondary" startIcon={<Download />}>
+                Baixar modelo
+              </Button>
+            </Box>
             <Button component="label" variant="outlined" startIcon={<Import />} sx={{ alignSelf: 'flex-start' }}>
               Escolher arquivo .xlsx
               <input
@@ -86,7 +97,7 @@ export function SettingsView({ org, members, myRole, canAdmin }: { org: Org; mem
             </Button>
             {summary && (
               <Alert severity="success">
-                {summary.showsCreated} shows novos · {summary.showsUpdated} atualizados · {summary.artistsCreated} artistas novos ·{' '}
+                {summary.showsCreated} shows novos · {summary.showsUpdated} atualizados · {summary.artistsCreated} artistas novos · {summary.artistsUpdated} artistas atualizados ·{' '}
                 {summary.membersCreated} integrantes · {summary.contactsCreated} contatos · {summary.settlementsLinked} fechamentos vinculados
               </Alert>
             )}
