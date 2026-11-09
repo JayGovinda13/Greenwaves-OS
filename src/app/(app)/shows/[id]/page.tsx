@@ -11,6 +11,7 @@ import { can, requireContext } from '@/lib/tenant';
 import { artistOptions, contactOptions } from '@/lib/queries';
 import { DEAL_TYPE_LABEL, PAYMENT_TERMS_LABEL, TX_CATEGORY_LABEL, hospitalityLabels, type DealType, type PaymentTerms, type TxCategory } from '@/lib/domain';
 import { TicketSalesCard } from '@/components/shows/TicketSalesCard';
+import { ScheduleCard } from '@/components/shows/ScheduleCard';
 import { dayjs, fmtDate, isUrl, money } from '@/lib/format';
 import { ResourceLink } from '@/components/ui/ResourceLink';
 import { TxStatusChip } from '@/components/ui/StatusChip';
@@ -47,6 +48,7 @@ export default async function ShowPage({ params }: { params: Promise<{ id: strin
       owner: { select: { name: true } },
       transactions: { orderBy: { date: 'asc' } },
       ticketReports: { orderBy: { reportedAt: 'desc' }, take: 30, include: { reportedBy: { select: { name: true } } } },
+      scheduleItems: true,
     },
   });
   if (!show) notFound();
@@ -93,6 +95,12 @@ export default async function ShowPage({ params }: { params: Promise<{ id: strin
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }, gap: 3, alignItems: 'start' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <ScheduleCard
+            showId={show.id}
+            showDay={show.date.toISOString().slice(0, 10)}
+            canEdit={can(ctx, 'PRODUCER')}
+            items={show.scheduleItems.map((i) => ({ id: i.id, kind: i.kind, day: i.day, time: i.time, title: i.title, location: i.location, notes: i.notes, done: i.done }))}
+          />
           <Card sx={{ p: 3 }}>
             <Typography variant="h5" mb={2}>Combinado</Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
@@ -157,6 +165,8 @@ export default async function ShowPage({ params }: { params: Promise<{ id: strin
           <Card sx={{ p: 3 }}>
             <Typography variant="h5" mb={2}>Pré-produção & logística</Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
+              <Field label="Endereço da casa" value={show.venueAddress} />
+              <Field label="Hotel" value={[show.lodgingName, show.lodgingAddress].filter(Boolean).join(' — ') || null} />
               <Field label="Ficha técnica" value={<MaybeLink value={show.techSheetUrl} />} />
               <Field label="Passagens" value={<MaybeLink value={show.travel} />} />
               <Field label="Hospedagem" value={<MaybeLink value={show.lodging} />} />

@@ -33,6 +33,9 @@ export interface ShowFormValues {
   city?: string | null;
   state?: string | null;
   venue?: string | null;
+  venueAddress?: string | null;
+  lodgingName?: string | null;
+  lodgingAddress?: string | null;
   eventName?: string | null;
   contactName?: string | null;
   dealType?: string;
@@ -250,6 +253,9 @@ export function ShowFormDialog({ open, onClose, initial, artists, contacts }: Pr
 
         <FormSection title="Pré-produção e logística">
           <F span={6}><TextField name="techSheetUrl" label="Ficha técnica / caderno técnico (link)" defaultValue={str(v.techSheetUrl)} /></F>
+          <F span={6}><TextField name="venueAddress" label="Endereço da casa" placeholder="Rua, número, bairro" defaultValue={str(v.venueAddress)} /></F>
+          <F span={3}><TextField name="lodgingName" label="Hotel / hospedagem" defaultValue={str(v.lodgingName)} /></F>
+          <F span={3}><TextField name="lodgingAddress" label="Endereço do hotel" defaultValue={str(v.lodgingAddress)} /></F>
           <F span={3}><TextField name="travel" label="Passagens" multiline minRows={2} defaultValue={str(v.travel)} /></F>
           <F span={3}><TextField name="lodging" label="Hospedagem" multiline minRows={2} defaultValue={str(v.lodging)} /></F>
           <F span={3}><TextField name="crewList" label="Lista de equipe" multiline minRows={2} defaultValue={str(v.crewList)} /></F>

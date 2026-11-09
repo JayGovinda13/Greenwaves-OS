@@ -4,7 +4,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
-import { EditPencil } from 'iconoir-react';
+import { EditPencil, Printer } from 'iconoir-react';
 import { deleteShow, setShowStatus } from '@/app/(app)/shows/actions';
 import { SHOW_STATUS, SHOW_STATUS_LABEL, type ShowStatus } from '@/lib/domain';
 import { BRAND } from '@/theme/brand';
@@ -46,6 +46,16 @@ export function ShowHeaderActions({ show, artists, contacts, canEdit, canDelete 
       >
         {SHOW_STATUS.map((s) => <MenuItem key={s} value={s}>{SHOW_STATUS_LABEL[s]}</MenuItem>)}
       </TextField>
+      <Button
+        component="a"
+        href={`/imprimir/roadbook/${show.id}`}
+        target="_blank"
+        variant="outlined"
+        startIcon={<Printer />}
+        sx={{ color: BRAND.cream, borderColor: 'rgba(255,247,234,.4)' }}
+      >
+        Exportar roadbook
+      </Button>
       {canEdit && (
         <Button variant="contained" color="secondary" startIcon={<EditPencil />} onClick={() => setOpen(true)}>
           Editar

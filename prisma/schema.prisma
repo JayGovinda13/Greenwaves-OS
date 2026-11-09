@@ -155,6 +155,9 @@ model Show {
   state          String?
   venue          String?
   venueUrl       String? // link do mapa da casa
+  venueAddress   String? // endereço da casa (roadbook)
+  lodgingName    String? // hotel/hospedagem
+  lodgingAddress String?
   eventName      String?
   status         String   @default("CONFIRMED") // PROSPECT | NEGOTIATING | CONFIRMED | DONE | CANCELED
   contactName    String? // contato livre quando não há Contact cadastrado
@@ -200,13 +203,14 @@ model Show {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  artist        Artist         @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  contact       Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  owner         User?          @relation("ShowOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  artist        Artist             @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  contact       Contact?           @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  owner         User?              @relation("ShowOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   transactions  Transaction[]
   tasks         Task[]
   ticketReports TicketReport[]
+  scheduleItems ShowScheduleItem[]
 
   @@index([organizationId, date])
   @@index([artistId])
@@ -295,4 +299,22 @@ model TicketReport {
   reportedBy User? @relation(fields: [reportedById], references: [id], onDelete: SetNull)
 
   @@index([showId, reportedAt])
+}
+
+// Roteiro do dia (roadbook): embarque, check-in, passagem de som, show, check-out...
+model ShowScheduleItem {
+  id        String   @id @default(cuid())
+  showId    String
+  kind      String   @default("OTHER") // ver SCHEDULE_KINDS em domain.ts
+  day       String // YYYY-MM-DD (horário local do evento)
+  time      String // HH:mm
+  title     String?
+  location  String?
+  notes     String?
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  show Show @relation(fields: [showId], references: [id], onDelete: Cascade)
+
+  @@index([showId, day, time])
 }

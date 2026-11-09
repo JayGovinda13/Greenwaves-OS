@@ -14,6 +14,7 @@ import { EditArtistButton } from '@/components/artists/ArtistButtons';
 import { accentStyle } from '@/components/artists/accent';
 import { nameFontSize } from '@/components/artists/nameSize';
 import { ArtistTabs } from '@/components/artists/ArtistTabs';
+import { RoadmapButton } from '@/components/tour/RoadmapButton';
 import { checklistProgress } from '@/lib/queries';
 
 export default async function ArtistPage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,11 +62,12 @@ export default async function ArtistPage({ params }: { params: Promise<{ id: str
               {[artist.originCity, artist.originState].filter(Boolean).join(' · ')}
               {artist.genres ? ` — ${artist.genres}` : ''}
             </Typography>
-            {can(ctx, 'ADMIN') && (
-              <Box sx={{ mt: 3 }}>
+            <Box sx={{ mt: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              {can(ctx, 'ADMIN') && (
                 <EditArtistButton artist={artist} sx={artist.accent === 'lime' ? { bgcolor: '#17201C', color: '#FFF7EA' } : undefined} />
-              </Box>
-            )}
+              )}
+              <RoadmapButton artistId={artist.id} buttonProps={{ sx: { color: 'inherit', borderColor: 'currentColor' } }} />
+            </Box>
           </Box>
           <Box>
             <Typography sx={{ fontSize: { xs: 15, md: 17 }, lineHeight: 1.55 }}>{artist.bio ?? 'Sem release cadastrado.'}</Typography>

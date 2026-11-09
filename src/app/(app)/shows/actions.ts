@@ -4,8 +4,9 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { requireRole, logActivity } from '@/lib/tenant';
 import { formToObject, runAction, UserError } from '@/lib/action';
-import { SHOW_CHECKLIST, SHOW_STATUS, showSchema, ticketReportSchema, type ChecklistKey, type ShowStatus } from '@/lib/domain';
+import { SHOW_CHECKLIST, SHOW_STATUS, scheduleItemSchema, showSchema, ticketReportSchema, type ChecklistKey, type ShowStatus } from '@/lib/domain';
 import { syncShowReceivable } from '@/lib/receivables';
+import { defaultSchedule, legToShow } from '@/lib/tour';
 import { fmtDate, toCalendarDate } from '@/lib/format';
 
 async function assertOwned(orgId: string, artistId: string, contactId: string | null) {
@@ -104,5 +105,61 @@ export async function addTicketReport(showId: string, fd: FormData) {
     revalidatePath('/shows');
     revalidatePath('/dashboard');
     return { message: 'Vendas atualizadas.' };
+  });
+}
+
+// ---------- Roteiro do dia (roadbook) ----------
+async function ownedShow(orgId: string, showId: string) {
+  const show = await prisma.show.findFirst({ where: { id: showId, organizationId: orgId }, select: { id: true } });
+  if (!show) throw new UserError('Show não encontrado');
+}
+
+export async function saveScheduleItem(showId: string, itemId: string | null, fd: FormData) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    await ownedShow(ctx.org.id, showId);
+    const input = scheduleItemSchema.parse(formToObject(fd));
+    if (itemId) {
+      const r = await prisma.showScheduleItem.updateMany({ where: { id: itemId, showId }, data: input });
+      if (!r.count) throw new UserError('Horário não encontrado');
+    } else await prisma.showScheduleItem.create({ data: { ...input, showId } });
+    revalidatePath(`/shows/${showId}`);
+    return { message: 'Roteiro atualizado.' };
+  });
+}
+
+export async function deleteScheduleItem(showId: string, itemId: string) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    await ownedShow(ctx.org.id, showId);
+    await prisma.showScheduleItem.deleteMany({ where: { id: itemId, showId } });
+    revalidatePath(`/shows/${showId}`);
+    return { message: 'Horário removido.' };
+  });
+}
+
+export async function toggleScheduleItem(showId: string, itemId: string, done: boolean) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    await ownedShow(ctx.org.id, showId);
+    await prisma.showScheduleItem.updateMany({ where: { id: itemId, showId }, data: { done } });
+    revalidatePath(`/shows/${showId}`);
+  });
+}
+
+/** Cria o roteiro padrão (só quando o show ainda não tem horários). */
+export async function generateSchedule(showId: string) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    await ownedShow(ctx.org.id, showId);
+    if (await prisma.showScheduleItem.count({ where: { showId } })) throw new UserError('Este show já tem roteiro.');
+    const { show, leg } = await legToShow(ctx.org.id, showId);
+    const items = defaultSchedule(show.date.toISOString().slice(0, 10), leg);
+    await prisma.showScheduleItem.createMany({
+      data: items.map((i) => ({ ...i, showId, title: i.title ?? null, location: i.location ?? null })),
+    });
+    await logActivity(ctx, 'updated', 'show', showId, 'Roteiro do dia gerado');
+    revalidatePath(`/shows/${showId}`);
+    return { message: 'Roteiro padrão criado: ajuste os horários.' };
   });
 }

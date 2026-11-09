@@ -20,6 +20,7 @@ import { SHOW_STATUS, SHOW_STATUS_LABEL, TICKETS_STALE_DAYS } from '@/lib/domain
 import { dayjs } from '@/lib/format';
 import { artistColor } from '@/lib/colors';
 import { ShowFormDialog } from './ShowFormDialog';
+import { RoadmapButton } from '@/components/tour/RoadmapButton';
 import { ShowsCalendar } from './ShowsCalendar';
 import { dealLabel } from './dealLabel';
 
@@ -144,6 +145,7 @@ export function ShowsView({ rows, artists, contacts, canEdit }: {
               <ToggleButton value="list" aria-label="Lista"><List /></ToggleButton>
               <ToggleButton value="calendar" aria-label="Calendário"><Calendar /></ToggleButton>
             </ToggleButtonGroup>
+            <RoadmapButton artists={artists} label="Roadmap" />
             {canEdit && <Button variant="contained" startIcon={<Plus />} onClick={() => setOpen(true)}>Novo show</Button>}
           </>
         }

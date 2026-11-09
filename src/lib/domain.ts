@@ -161,6 +161,9 @@ export const showSchema = z.object({
   posterUrl: optUrl,
   socialUrl: optUrl,
   techSheetUrl: optUrl,
+  venueAddress: optStr,
+  lodgingName: optStr,
+  lodgingAddress: optStr,
   travel: optStr,
   lodging: optStr,
   crewList: optStr,
@@ -321,4 +324,32 @@ export const ticketReportSchema = z.object({
   sold: z.coerce.number({ invalid_type_error: 'Informe um número' }).int('Use um número inteiro').min(0, 'Não pode ser negativo'),
   source: z.enum(TICKET_SOURCES),
   note: optStr,
+});
+
+// ---------- Roteiro do dia (roadbook) ----------
+export const SCHEDULE_KINDS = [
+  'DEPARTURE', 'ARRIVAL', 'CHECK_IN', 'LOAD_IN', 'SOUNDCHECK', 'MEAL', 'DOORS', 'SET', 'LOAD_OUT', 'CHECK_OUT', 'OTHER',
+] as const;
+export type ScheduleKind = (typeof SCHEDULE_KINDS)[number];
+export const SCHEDULE_KIND_LABEL: Record<ScheduleKind, string> = {
+  DEPARTURE: 'Embarque / saída',
+  ARRIVAL: 'Chegada',
+  CHECK_IN: 'Check-in hotel',
+  LOAD_IN: 'Montagem / carga',
+  SOUNDCHECK: 'Passagem de som',
+  MEAL: 'Refeição',
+  DOORS: 'Abertura da casa',
+  SET: 'Show',
+  LOAD_OUT: 'Desmontagem',
+  CHECK_OUT: 'Check-out hotel',
+  OTHER: 'Outro',
+};
+
+export const scheduleItemSchema = z.object({
+  kind: z.enum(SCHEDULE_KINDS),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Informe a data'),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Informe o horário (HH:mm)'),
+  title: optStr,
+  location: optStr,
+  notes: optStr,
 });
