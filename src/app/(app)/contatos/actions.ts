@@ -10,7 +10,8 @@ export async function saveContact(id: string | null, fd: FormData) {
     const ctx = await requireRole('PRODUCER');
     const input = contactSchema.parse(formToObject(fd));
     const state = input.state?.toUpperCase() ?? null;
-    const data = { ...input, state, region: input.region ?? (state ? REGION_BY_STATE[state] ?? null : null) };
+    // A região é sempre derivada do estado
+    const data = { ...input, state, region: state ? REGION_BY_STATE[state] ?? null : null };
     let contactId = id;
     if (id) {
       const r = await prisma.contact.updateMany({ where: { id, organizationId: ctx.org.id }, data });

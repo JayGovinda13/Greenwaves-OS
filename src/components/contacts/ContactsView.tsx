@@ -18,7 +18,7 @@ import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { ptBR } from '@mui/x-data-grid/locales';
 import { EditPencil, Instagram, Mail, Phone, Plus, Search } from 'iconoir-react';
 import { deleteContact, saveContact } from '@/app/(app)/contatos/actions';
-import { BR_STATES, CONTACT_KINDS, CONTACT_KIND_LABEL, type ContactKind } from '@/lib/domain';
+import { BR_STATES, CONTACT_KINDS, CONTACT_KIND_LABEL, REGION_BY_STATE, STATE_NAME, type ContactKind } from '@/lib/domain';
 import { instagramUrl } from '@/lib/format';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ConfirmButton } from '@/components/ui/ConfirmButton';
@@ -35,6 +35,7 @@ const REGIONS = ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
 function ContactDialog({ contact, onClose }: { contact?: ContactRow; onClose: () => void }) {
   const { submit, pending, err } = useFormAction((fd) => saveContact(contact?.id ?? null, fd), onClose);
   const s = (x: string | null | undefined) => x ?? '';
+  const [state, setState] = useState(contact?.state ?? '');
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth slotProps={{ paper: { component: 'form', onSubmit: submit } as object }}>
       <DialogTitle>{contact ? 'Editar contato' : 'Novo contratante'}</DialogTitle>
@@ -42,23 +43,27 @@ function ContactDialog({ contact, onClose }: { contact?: ContactRow; onClose: ()
         <FormSection title="Quem">
           <F span={3}><TextField name="name" label="Contratante" required defaultValue={s(contact?.name)} {...err('name')} /></F>
           <F span={3}><TextField name="company" label="Casa / festival / coletivo" defaultValue={s(contact?.company)} /></F>
-          <F span={2}>
+          <F span={3}>
             <TextField select name="kind" label="Tipo" defaultValue={contact?.kind ?? 'VENUE'}>
               {CONTACT_KINDS.map((k) => <MenuItem key={k} value={k}>{CONTACT_KIND_LABEL[k]}</MenuItem>)}
             </TextField>
           </F>
-          <F span={2}><TextField name="city" label="Cidade" defaultValue={s(contact?.city)} /></F>
-          <F span={1}>
-            <TextField select name="state" label="UF" defaultValue={contact?.state ?? ''}>
+          <F span={3}>
+            <TextField select name="state" label="Estado" value={state} onChange={(e) => setState(e.target.value)}>
               <MenuItem value="">—</MenuItem>
-              {BR_STATES.map((u) => <MenuItem key={u} value={u}>{u}</MenuItem>)}
+              {BR_STATES.map((u) => <MenuItem key={u} value={u}>{u} — {STATE_NAME[u]}</MenuItem>)}
             </TextField>
           </F>
-          <F span={1}>
-            <TextField select name="region" label="Região" defaultValue={contact?.region ?? ''}>
-              <MenuItem value="">Auto</MenuItem>
-              {REGIONS.map((r) => <MenuItem key={r} value={r}>{r}</MenuItem>)}
-            </TextField>
+          <F span={3}><TextField name="city" label="Cidade" defaultValue={s(contact?.city)} /></F>
+          <F span={3}>
+            <TextField
+              label="Região"
+              value={state ? REGION_BY_STATE[state] ?? '' : ''}
+              placeholder="Definida pelo estado"
+              disabled
+              helperText="Preenchida automaticamente pelo estado"
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
           </F>
         </FormSection>
         <FormSection title="Contato">
