@@ -3,6 +3,7 @@ import { useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import AppBar from '@mui/material/AppBar';
+import Badge from '@mui/material/Badge';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
@@ -16,7 +17,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useColorScheme } from '@mui/material/styles';
 import {
-  Calendar, Community, HalfMoon, HomeSimple, LogOut, Menu as MenuIcon, MusicDoubleNote, Settings, SunLight, Wallet, Check,
+  Calendar, Community, HalfMoon, TaskList, HomeSimple, LogOut, Menu as MenuIcon, MusicDoubleNote, Settings, SunLight, Wallet, Check,
 } from 'iconoir-react';
 import { Logo } from '@/components/brand/Logo';
 import { WaveMark } from '@/components/brand/WaveMark';
@@ -24,6 +25,7 @@ import { BRAND, FOREST_GRADIENT } from '@/theme/brand';
 import { initials } from '@/lib/format';
 import { ROLE_LABEL, type Role } from '@/lib/domain';
 import { logout, switchOrganization } from '@/app/(auth)/actions';
+import { TasksDrawer } from '@/components/tasks/TasksDrawer';
 
 const DRAWER = 256;
 
@@ -41,6 +43,7 @@ interface Props {
   org: { id: string; name: string; plan: string };
   role: Role;
   orgs: { id: string; name: string; role: Role }[];
+  openTasks: number;
   children: React.ReactNode;
 }
 
@@ -113,7 +116,8 @@ function ColorModeToggle() {
   );
 }
 
-export function AppShell({ user, org, role, orgs, children }: Props) {
+export function AppShell({ user, org, role, orgs, openTasks, children }: Props) {
+  const [tasksOpen, setTasksOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [pending, startTransition] = useTransition();
@@ -151,6 +155,13 @@ export function AppShell({ user, org, role, orgs, children }: Props) {
               <MenuIcon />
             </IconButton>
             <Box sx={{ flex: 1 }} />
+            <Tooltip title="Tarefas">
+              <IconButton onClick={() => setTasksOpen(true)} aria-label="Tarefas">
+                <Badge badgeContent={openTasks} color="secondary" max={99} sx={{ '& .MuiBadge-badge': { fontWeight: 800 } }}>
+                  <TaskList />
+                </Badge>
+              </IconButton>
+            </Tooltip>
             <ColorModeToggle />
             <Box
               component="button"
@@ -193,6 +204,7 @@ export function AppShell({ user, org, role, orgs, children }: Props) {
             </Menu>
           </Toolbar>
         </AppBar>
+        <TasksDrawer open={tasksOpen} onClose={() => setTasksOpen(false)} />
         <Box component="main" sx={{ flex: 1, p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1480, width: '100%', mx: 'auto' }}>
           {children}
         </Box>

@@ -223,3 +223,17 @@ export const transactionSchema = z.object({
   artistId: optStr,
   notes: optStr,
 });
+
+// ---------- Tarefas ----------
+export const TASK_PRIORITIES = ['LOW', 'NORMAL', 'HIGH'] as const;
+export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+export const TASK_PRIORITY_LABEL: Record<TaskPriority, string> = { LOW: 'Baixa', NORMAL: 'Normal', HIGH: 'Alta' };
+
+export const taskSchema = z.object({
+  title: z.string().trim().min(1, 'Descreva a tarefa').max(200),
+  description: optStr,
+  assigneeId: z.string().min(1, 'Escolha o responsável'),
+  dueDate: optStr,
+  priority: z.enum(TASK_PRIORITIES).default('NORMAL'),
+  showId: optStr,
+});
