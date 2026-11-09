@@ -31,6 +31,8 @@ export default async function ShowsPage() {
     doorPercent: s.doorPercent,
     dealNotes: s.dealNotes,
     ticketsSold: s.ticketsSold,
+    ticketsUpdatedAt: s.ticketsUpdatedAt?.toISOString() ?? null,
+    capacity: s.capacity,
     progress: checklistProgress(s),
   }));
   return <ShowsView rows={rows} artists={artists} contacts={contacts} canEdit={can(ctx, 'PRODUCER')} />;

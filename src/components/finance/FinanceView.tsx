@@ -28,11 +28,12 @@ import { ConfirmButton } from '@/components/ui/ConfirmButton';
 import { F, FormSection } from '@/components/ui/FormSection';
 import { useFormAction } from '@/components/ui/useFormAction';
 import { useToast } from '@/components/ui/Toast';
+import { receivableState } from '@/lib/receivables';
 
 export interface TxRow {
   id: string; type: string; category: string; description: string; amount: number; date: string; dueDate: string | null;
   status: string; method: string | null; showId: string | null; artistId: string | null; notes: string | null;
-  artist: string | null; showLabel: string | null;
+  artist: string | null; showLabel: string | null; paidAt: string | null; source: string | null;
 }
 type Opt = { id: string; name: string };
 type ShowOpt = { id: string; artistId: string; label: string };
@@ -99,12 +100,12 @@ function TxDialog({ tx, onClose, artists, shows }: { tx?: TxRow; onClose: () => 
   );
 }
 
-export function FinanceView({ rows, artists, shows, canEdit, header, showFilter }: {
-  rows: TxRow[]; artists: Opt[]; shows: ShowOpt[]; canEdit: boolean; header: React.ReactNode; showFilter: string | null;
+export function FinanceView({ rows, artists, shows, canEdit, header, showFilter, initialStatus }: {
+  rows: TxRow[]; artists: Opt[]; shows: ShowOpt[]; canEdit: boolean; header: React.ReactNode; showFilter: string | null; initialStatus?: string;
 }) {
   const [q, setQ] = useState('');
   const [type, setType] = useState<'all' | 'INCOME' | 'EXPENSE'>('all');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(initialStatus ?? '');
   const [onlyShow, setOnlyShow] = useState(showFilter);
   const [editing, setEditing] = useState<TxRow | 'new' | null>(null);
   const [, start] = useTransition();
@@ -115,7 +116,7 @@ export function FinanceView({ rows, artists, shows, canEdit, header, showFilter 
     return rows.filter(
       (r) =>
         (type === 'all' || r.type === type) &&
-        (!status || r.status === status) &&
+        (!status || (status === 'OVERDUE' ? receivableState(r) === 'OVERDUE' : r.status === status)) &&
         (!onlyShow || r.showId === onlyShow) &&
         (!t || [r.description, r.artist, r.showLabel].some((x) => x?.toLowerCase().includes(t))),
     );
@@ -129,12 +130,12 @@ export function FinanceView({ rows, artists, shows, canEdit, header, showFilter 
       renderCell: ({ row }) => (
         <Box sx={{ minWidth: 0 }}>
           <Typography fontWeight={700} fontSize={14} noWrap>{row.description}</Typography>
-          <Typography fontSize={12} color="text.secondary" noWrap>{[TX_CATEGORY_LABEL[row.category as TxCategory], row.artist, row.showLabel].filter(Boolean).join(' · ')}</Typography>
+          <Typography fontSize={12} color="text.secondary" noWrap>{[TX_CATEGORY_LABEL[row.category as TxCategory], row.artist, row.showLabel, row.source === 'SHOW_FEE' ? 'gerado pelo show' : null].filter(Boolean).join(' · ')}</Typography>
         </Box>
       ),
     },
     { field: 'dueDate', headerName: 'Vencimento', width: 110, valueFormatter: (v: string | null) => fmtDate(v) },
-    { field: 'status', headerName: 'Status', width: 115, renderCell: ({ row }) => <TxStatusChip status={row.status} /> },
+    { field: 'status', headerName: 'Status', width: 140, renderCell: ({ row }) => <TxStatusChip status={row.status} dueDate={row.dueDate} date={row.date} paidAt={row.paidAt} /> },
     {
       field: 'amount', headerName: 'Valor', width: 140, type: 'number',
       valueGetter: (_, r) => (r.type === 'INCOME' ? r.amount : -r.amount),
@@ -187,6 +188,7 @@ export function FinanceView({ rows, artists, shows, canEdit, header, showFilter 
         <TextField select label="Status" value={status} onChange={(e) => setStatus(e.target.value)} sx={{ flex: '1 1 140px' }}>
           <MenuItem value="">Todos</MenuItem>
           {TX_STATUS.map((s) => <MenuItem key={s} value={s}>{TX_STATUS_LABEL[s]}</MenuItem>)}
+          <MenuItem value="OVERDUE">Atrasados</MenuItem>
         </TextField>
         {onlyShow && <Chip label="Filtrado por show" onDelete={() => setOnlyShow(null)} deleteIcon={<Xmark />} color="primary" />}
         <Typography sx={{ ml: 'auto', fontWeight: 800 }}>Saldo filtrado: {money(total, true)}</Typography>

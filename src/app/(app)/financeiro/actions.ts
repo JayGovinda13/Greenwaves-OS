@@ -27,10 +27,13 @@ export async function saveTransaction(id: string | null, fd: FormData) {
       dueDate: input.dueDate ? toCalendarDate(input.dueDate) : null,
     };
     let txId = id;
+    const before = id ? await prisma.transaction.findFirst({ where: { id, organizationId: ctx.org.id }, select: { paidAt: true } }) : null;
+    // paidAt registra quando o pagamento foi confirmado (base para medir adimplência)
+    const paidAt = data.status === 'PAID' ? before?.paidAt ?? new Date() : null;
     if (id) {
-      const r = await prisma.transaction.updateMany({ where: { id, organizationId: ctx.org.id }, data });
+      const r = await prisma.transaction.updateMany({ where: { id, organizationId: ctx.org.id }, data: { ...data, paidAt } });
       if (!r.count) throw new UserError('Lançamento não encontrado');
-    } else txId = (await prisma.transaction.create({ data: { ...data, organizationId: ctx.org.id } })).id;
+    } else txId = (await prisma.transaction.create({ data: { ...data, paidAt, organizationId: ctx.org.id } })).id;
     await logActivity(ctx, id ? 'updated' : 'created', 'transaction', txId, `${input.description} (${money(data.amount, true)})`);
     revalidate();
     return { message: 'Lançamento salvo.' };
@@ -40,7 +43,7 @@ export async function saveTransaction(id: string | null, fd: FormData) {
 export async function markPaid(id: string) {
   return runAction(async () => {
     const ctx = await requireRole('ADMIN');
-    const r = await prisma.transaction.updateMany({ where: { id, organizationId: ctx.org.id }, data: { status: 'PAID' } });
+    const r = await prisma.transaction.updateMany({ where: { id, organizationId: ctx.org.id }, data: { status: 'PAID', paidAt: new Date() } });
     if (!r.count) throw new UserError('Lançamento não encontrado');
     await logActivity(ctx, 'updated', 'transaction', id, 'Marcado como pago');
     revalidate();

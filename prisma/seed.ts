@@ -65,9 +65,10 @@ async function main() {
   const summary = await importIntoOrganization(prisma, org.id, workbook);
   console.table(summary);
 
-  // Recebíveis derivados dos combinados com cachê definido (um lançamento por show, idempotente)
+  // Demo: cachês de shows já realizados marcados como pagos no dia do show
+  // (os shows futuros ganham recebível automático pelo importador)
   const shows = await prisma.show.findMany({
-    where: { organizationId: org.id, fee: { not: null }, transactions: { none: {} } },
+    where: { organizationId: org.id, fee: { not: null }, dealType: { not: 'DOOR' }, transactions: { none: {} } },
     include: { artist: { select: { name: true } } },
   });
   const startOfToday = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
@@ -84,6 +85,8 @@ async function main() {
         date: s.date,
         dueDate: s.date,
         status: s.date < startOfToday ? 'PAID' : 'PENDING',
+        paidAt: s.date < startOfToday ? s.date : null,
+        source: 'SHOW_FEE',
         method: 'PIX',
       },
     });

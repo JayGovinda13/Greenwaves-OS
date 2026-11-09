@@ -152,8 +152,10 @@ export const showSchema = z.object({
   doorPercent: optInt,
   dealNotes: optStr,
   hospitality: optStr,
+  hospitalityNotes: optStr,
+  paymentTerms: z.enum(['ON_SITE', 'SCHEDULED']).default('ON_SITE'),
+  paymentDueDate: optStr,
   ticketUrl: optUrl,
-  ticketsSold: optInt,
   capacity: optInt,
   ticketPrice: moneyInput,
   posterUrl: optUrl,
@@ -164,6 +166,9 @@ export const showSchema = z.object({
   crewList: optStr,
   guestList: optStr,
   notes: optStr,
+}).superRefine((v, ctx) => {
+  if (v.paymentTerms === 'SCHEDULED' && !v.paymentDueDate)
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['paymentDueDate'], message: 'Informe a data combinada para o pagamento' });
 });
 export type ShowInput = z.input<typeof showSchema>;
 
@@ -181,6 +186,8 @@ export const artistSchema = z.object({
   photosUrl: optUrl,
   settlementUrl: optUrl,
   baseFee: moneyInput,
+  hospitalityLocal: optStr,
+  hospitalityTravel: optStr,
   accent: z.enum(['green', 'lime', 'cream']).default('green'),
   active: z.boolean().default(true),
 });
@@ -236,4 +243,82 @@ export const taskSchema = z.object({
   dueDate: optStr,
   priority: z.enum(TASK_PRIORITIES).default('NORMAL'),
   showId: optStr,
+});
+
+// ---------- Contrapartidas ----------
+export const HOSPITALITY = [
+  'LODGING', 'FOOD', 'DRESSING_ROOM', 'LOCAL_TRANSFER', 'AIRFARE', 'GROUND_TRAVEL', 'FUEL', 'BACKLINE', 'EXTRA_BAGGAGE',
+] as const;
+export type Hospitality = (typeof HOSPITALITY)[number];
+export const HOSPITALITY_LABEL: Record<Hospitality, string> = {
+  LODGING: 'Hospedagem',
+  FOOD: 'Alimentação',
+  DRESSING_ROOM: 'Camarim',
+  LOCAL_TRANSFER: 'Translado local',
+  AIRFARE: 'Passagens aéreas',
+  GROUND_TRAVEL: 'Van / ônibus',
+  FUEL: 'Combustível',
+  BACKLINE: 'Backline',
+  EXTRA_BAGGAGE: 'Bagagem extra',
+};
+/** Padrões usados quando o artista ainda não tem contrapartidas configuradas. */
+export const DEFAULT_HOSPITALITY_LOCAL: Hospitality[] = ['FOOD', 'DRESSING_ROOM'];
+export const DEFAULT_HOSPITALITY_TRAVEL: Hospitality[] = ['LODGING', 'FOOD', 'DRESSING_ROOM', 'LOCAL_TRANSFER', 'AIRFARE'];
+
+const LEGACY_HOSPITALITY: Record<string, Hospitality[]> = {
+  hospedagem: ['LODGING'],
+  'alimentacao/camarim': ['FOOD', 'DRESSING_ROOM'],
+  alimentacao: ['FOOD'],
+  camarim: ['DRESSING_ROOM'],
+  passagens: ['AIRFARE'],
+  transporte: ['GROUND_TRAVEL'],
+  backline: ['BACKLINE'],
+  bagagem: ['EXTRA_BAGGAGE'],
+};
+
+/** Lê o campo de contrapartidas (códigos novos ou texto antigo) e devolve códigos + sobras em texto. */
+export function parseHospitality(value: string | null | undefined): { items: Hospitality[]; other: string[] } {
+  const items = new Set<Hospitality>();
+  const other: string[] = [];
+  for (const raw of (value ?? '').split(',').map((t) => t.trim()).filter(Boolean)) {
+    if ((HOSPITALITY as readonly string[]).includes(raw)) items.add(raw as Hospitality);
+    else {
+      const key = raw.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+      const mapped = LEGACY_HOSPITALITY[key];
+      if (mapped) mapped.forEach((m) => items.add(m));
+      else other.push(raw);
+    }
+  }
+  return { items: HOSPITALITY.filter((h) => items.has(h)), other };
+}
+export function hospitalityLabels(value: string | null | undefined): string[] {
+  const { items, other } = parseHospitality(value);
+  return [...items.map((i) => HOSPITALITY_LABEL[i]), ...other];
+}
+
+// ---------- Pagamento do show ----------
+export const PAYMENT_TERMS = ['ON_SITE', 'SCHEDULED'] as const;
+export type PaymentTerms = (typeof PAYMENT_TERMS)[number];
+export const PAYMENT_TERMS_LABEL: Record<PaymentTerms, string> = {
+  ON_SITE: 'No ato (dia do show)',
+  SCHEDULED: 'Em data combinada',
+};
+
+// ---------- Vendas de ingressos ----------
+export const TICKET_SOURCES = ['PLATFORM', 'PROMOTER', 'ESTIMATE', 'IMPORT', 'MANUAL'] as const;
+export type TicketSource = (typeof TICKET_SOURCES)[number];
+export const TICKET_SOURCE_LABEL: Record<TicketSource, string> = {
+  PLATFORM: 'Painel da plataforma de vendas',
+  PROMOTER: 'Informado pelo contratante',
+  ESTIMATE: 'Estimativa',
+  IMPORT: 'Importação de planilha',
+  MANUAL: 'Atualização manual',
+};
+/** Dias sem atualização a partir dos quais as vendas de um show futuro são consideradas desatualizadas. */
+export const TICKETS_STALE_DAYS = 7;
+
+export const ticketReportSchema = z.object({
+  sold: z.coerce.number({ invalid_type_error: 'Informe um número' }).int('Use um número inteiro').min(0, 'Não pode ser negativo'),
+  source: z.enum(TICKET_SOURCES),
+  note: optStr,
 });

@@ -28,6 +28,7 @@ import { useFormAction } from '@/components/ui/useFormAction';
 export interface ContactRow {
   id: string; name: string; company: string | null; kind: string; region: string | null; state: string | null; city: string | null;
   phone: string | null; email: string | null; instagram: string | null; link: string | null; notes: string | null; shows: number;
+  payments: { onTime: number; late: number; overdue: number; open: number } | null;
 }
 
 const REGIONS = ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
@@ -124,6 +125,29 @@ export function ContactsView({ rows, canEdit, canDelete, initialQuery }: { rows:
       ),
     },
     { field: 'shows', headerName: 'Shows', width: 90, type: 'number' },
+    {
+      field: 'payments', headerName: 'Pagamentos', width: 150,
+      valueGetter: (_, r) => {
+        const p = r.payments;
+        if (!p) return -1;
+        const settled = p.onTime + p.late;
+        return p.overdue ? -0.5 : settled ? p.onTime / settled : -1;
+      },
+      renderCell: ({ row }) => {
+        const p = row.payments;
+        if (!p) return <Typography fontSize={13} color="text.secondary">—</Typography>;
+        const settled = p.onTime + p.late;
+        const detail = `${p.onTime} em dia · ${p.late} com atraso · ${p.overdue} vencido(s) · ${p.open} a vencer`;
+        let chip: React.ReactNode;
+        if (p.overdue) chip = <Chip size="small" color="error" label={`${p.overdue} em atraso`} />;
+        else if (!settled) chip = <Chip size="small" variant="outlined" label={`${p.open} a vencer`} />;
+        else {
+          const pct = Math.round((p.onTime / settled) * 100);
+          chip = <Chip size="small" color={pct === 100 ? 'success' : 'warning'} variant="outlined" label={`${pct}% em dia (${settled})`} />;
+        }
+        return <Tooltip title={detail}><span>{chip}</span></Tooltip>;
+      },
+    },
     {
       field: 'actions', headerName: '', width: 100, sortable: false, align: 'right',
       renderCell: ({ row }) => (

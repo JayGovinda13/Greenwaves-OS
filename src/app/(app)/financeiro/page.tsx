@@ -6,14 +6,15 @@ import { prisma } from '@/lib/db';
 import { can, requireContext } from '@/lib/tenant';
 import { dayjs, fmtDate, money } from '@/lib/format';
 import { StatCard } from '@/components/ui/StatCard';
+import { receivableState } from '@/lib/receivables';
 import { ResourceLink } from '@/components/ui/ResourceLink';
 import { FinanceView } from '@/components/finance/FinanceView';
 import { MonthlyChart } from '@/components/finance/MonthlyChart';
 
 export const metadata = { title: 'Financeiro' };
 
-export default async function FinancePage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
-  const { show: showFilter } = await searchParams;
+export default async function FinancePage({ searchParams }: { searchParams: Promise<{ show?: string; status?: string }> }) {
+  const { show: showFilter, status: statusFilter } = await searchParams;
   const ctx = await requireContext();
   const year = new Date().getUTCFullYear();
   const [txs, artists, shows] = await Promise.all([
@@ -36,7 +37,9 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const receivable = sum((t) => t.type === 'INCOME' && t.status === 'PENDING');
   const expenses = sum((t) => t.type === 'EXPENSE' && t.status === 'PAID');
   const payable = sum((t) => t.type === 'EXPENSE' && t.status === 'PENDING');
-  const overdue = live.filter((t) => t.status === 'PENDING' && t.type === 'INCOME' && (t.dueDate ?? t.date) < new Date()).length;
+  const overdueList = live.filter((t) => t.type === 'INCOME' && receivableState(t) === 'OVERDUE');
+  const overdue = overdueList.length;
+  const overdueAmount = overdueList.reduce((s, t) => s + t.amount, 0);
 
   const months = Array.from({ length: 12 }, (_, i) => dayjs.utc(`${year}-01-01`).add(i, 'month'));
   const monthly = months.map((m) => {
@@ -53,10 +56,12 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
       <FinanceView
         canEdit={can(ctx, 'ADMIN')}
         showFilter={showFilter ?? null}
+        initialStatus={statusFilter}
         rows={txs.map((t) => ({
           id: t.id, type: t.type, category: t.category, description: t.description, amount: t.amount,
           date: t.date.toISOString(), dueDate: t.dueDate?.toISOString() ?? null, status: t.status, method: t.method,
           showId: t.showId, artistId: t.artistId, notes: t.notes, artist: t.artist?.name ?? null,
+          paidAt: t.paidAt?.toISOString() ?? null, source: t.source,
           showLabel: t.show ? `${t.show.city ?? ''} ${fmtDate(t.show.date, 'DD/MM')}`.trim() : null,
         }))}
         artists={artists.map(({ id, name }) => ({ id, name }))}
@@ -65,7 +70,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
           <>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
               <StatCard label="Recebido" value={money(received)} icon={<ArrowDownLeft />} tone="forest" hint="receitas pagas" />
-              <StatCard label="A receber" value={money(receivable)} icon={<Coins />} tone="lime" hint={overdue ? `${overdue} vencido(s)` : 'nenhum vencido'} />
+              <StatCard label="A receber" value={money(receivable)} icon={<Coins />} tone="lime" hint={overdue ? `${money(overdueAmount)} em atraso (${overdue})` : 'nada em atraso'} />
               <StatCard label="Despesas pagas" value={money(expenses)} icon={<ArrowUpRight />} hint={payable ? `${money(payable)} a pagar` : 'nada a pagar'} />
               <StatCard label="Saldo" value={money(received - expenses)} icon={<Wallet />} hint="recebido − despesas pagas" />
             </Box>

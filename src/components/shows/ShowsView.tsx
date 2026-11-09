@@ -16,7 +16,7 @@ import { ptBR } from '@mui/x-data-grid/locales';
 import { Calendar, List, Plus, Search } from 'iconoir-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ShowStatusChip } from '@/components/ui/StatusChip';
-import { SHOW_STATUS, SHOW_STATUS_LABEL } from '@/lib/domain';
+import { SHOW_STATUS, SHOW_STATUS_LABEL, TICKETS_STALE_DAYS } from '@/lib/domain';
 import { dayjs } from '@/lib/format';
 import { artistColor } from '@/lib/colors';
 import { ShowFormDialog } from './ShowFormDialog';
@@ -38,6 +38,8 @@ export interface ShowRow {
   doorPercent: number | null;
   dealNotes: string | null;
   ticketsSold: number | null;
+  ticketsUpdatedAt: string | null;
+  capacity: number | null;
   progress: { done: number; total: number };
 }
 
@@ -98,7 +100,26 @@ export function ShowsView({ rows, artists, contacts, canEdit }: {
     { field: 'venue', headerName: 'Local', flex: 1.2, minWidth: 170 },
     { field: 'status', headerName: 'Status', width: 130, renderCell: ({ row }) => <ShowStatusChip status={row.status} /> },
     { field: 'deal', headerName: 'Combinado', width: 170, valueGetter: (_, r) => dealLabel(r), sortComparator: (a, b) => String(a).localeCompare(String(b)) },
-    { field: 'ticketsSold', headerName: 'Ingressos', width: 100, type: 'number' },
+    {
+      field: 'ticketsSold', headerName: 'Ingressos', width: 120, type: 'number',
+      renderCell: ({ row }) => {
+        if (row.ticketsSold === null) return <Typography fontSize={13} color="text.secondary" sx={{ width: '100%', textAlign: 'right' }}>—</Typography>;
+        const age = row.ticketsUpdatedAt ? dayjs().diff(dayjs(row.ticketsUpdatedAt), 'day') : null;
+        const stale = row.date.slice(0, 10) >= today && (age === null || age >= TICKETS_STALE_DAYS);
+        return (
+          <Box sx={{ width: '100%', textAlign: 'right' }}>
+            <Typography fontWeight={800} fontSize={14} lineHeight={1.2}>
+              {row.ticketsSold}{row.capacity ? <Typography component="span" fontSize={12} color="text.secondary">/{row.capacity}</Typography> : null}
+            </Typography>
+            {age !== null && (
+              <Typography fontSize={11} lineHeight={1.2} color={stale ? 'warning.main' : 'text.secondary'} fontWeight={stale ? 700 : 400}>
+                {age === 0 ? 'hoje' : `há ${age}d`}
+              </Typography>
+            )}
+          </Box>
+        );
+      },
+    },
     {
       field: 'progress', headerName: 'Produção', width: 130,
       valueGetter: (_, r) => r.progress.done / r.progress.total,

@@ -5,6 +5,7 @@
 import ExcelJS from 'exceljs';
 import type { PrismaClient } from '@prisma/client';
 import { parseDeal, splitContact } from '../deal';
+import { syncShowReceivable } from '../receivables';
 import { REGION_BY_STATE } from '../domain';
 import { slugify } from '../format';
 import { CASTING_2026 } from '../../../prisma/data/casting';
@@ -513,7 +514,6 @@ export async function importIntoOrganization(
       contactName: [s.contactName, s.contactPhone].filter(Boolean).join(' · ') || null,
       posterUrl: s.posterUrl,
       ticketUrl: s.ticketUrl,
-      ticketsSold: s.ticketsSold,
       techSheetUrl: s.techSheetUrl,
       socialUrl: s.socialUrl,
       dealNotes: s.dealNotes,
@@ -521,6 +521,7 @@ export async function importIntoOrganization(
       fee: deal.fee,
       doorPercent: deal.doorPercent,
       hospitality: deal.hospitality,
+      hospitalityNotes: deal.hospitalityNotes,
       travel: s.travel,
       lodging: s.lodging,
       crewList: s.crewList,
@@ -536,16 +537,32 @@ export async function importIntoOrganization(
     };
     const existing = await db.show.findFirst({
       where: { organizationId, artistId: aId, date, ...(s.venue ? { venue: s.venue } : { city: s.city }) },
-      select: { id: true },
+      select: { id: true, ticketsSold: true },
     });
+    let showId: string;
     if (existing) {
+      // A planilha é a fonte: reimportar atualiza os dados do show
       await db.show.update({ where: { id: existing.id }, data: fields });
+      showId = existing.id;
       summary.showsUpdated++;
     } else {
-      await db.show.create({
+      const created = await db.show.create({
         data: { organizationId, artistId: aId, date, status: s.date < todayIso ? 'DONE' : 'CONFIRMED', ...fields },
       });
+      showId = created.id;
       summary.showsCreated++;
+    }
+
+    // Vendas da planilha entram no histórico (só quando mudam)
+    if (s.ticketsSold !== null && s.ticketsSold !== existing?.ticketsSold) {
+      await db.ticketReport.create({ data: { showId, sold: s.ticketsSold, source: 'IMPORT' } });
+      await db.show.update({ where: { id: showId }, data: { ticketsSold: s.ticketsSold, ticketsUpdatedAt: new Date() } });
+    }
+
+    // Recebível automático só para shows futuros: o histórico passado fica nas planilhas de fechamento
+    if (s.date >= todayIso) {
+      const show = await db.show.findUniqueOrThrow({ where: { id: showId }, include: { artist: { select: { name: true } } } });
+      await syncShowReceivable(db, show, show.artist.name);
     }
   }
 

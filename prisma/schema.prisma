@@ -47,9 +47,10 @@ model User {
 
   memberships   Membership[]
   activities    Activity[]
-  showsOwned    Show[]       @relation("ShowOwner")
-  tasksAssigned Task[]       @relation("TaskAssignee")
-  tasksCreated  Task[]       @relation("TaskCreator")
+  showsOwned    Show[]         @relation("ShowOwner")
+  tasksAssigned Task[]         @relation("TaskAssignee")
+  tasksCreated  Task[]         @relation("TaskCreator")
+  ticketReports TicketReport[]
 }
 
 model Membership {
@@ -66,26 +67,28 @@ model Membership {
 }
 
 model Artist {
-  id             String   @id @default(cuid())
-  organizationId String
-  name           String
-  slug           String
-  instagram      String?
-  originCity     String?
-  originState    String?
-  genres         String? // separado por vírgula
-  bio            String?
-  latestRelease  String?
-  label          String?
-  mediaKitUrl    String?
-  riderUrl       String?
-  photosUrl      String?
-  settlementUrl  String? // planilha de fechamento
-  baseFee        Int? // cachê de referência (centavos)
-  accent         String   @default("green") // green | lime | cream (estilo do card)
-  active         Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                String   @id @default(cuid())
+  organizationId    String
+  name              String
+  slug              String
+  instagram         String?
+  originCity        String?
+  originState       String?
+  genres            String? // separado por vírgula
+  bio               String?
+  latestRelease     String?
+  label             String?
+  mediaKitUrl       String?
+  riderUrl          String?
+  photosUrl         String?
+  settlementUrl     String? // planilha de fechamento
+  baseFee           Int? // cachê de referência (centavos)
+  hospitalityLocal  String? // contrapartidas padrão na própria UF (códigos separados por vírgula)
+  hospitalityTravel String? // contrapartidas padrão quando viaja para outra UF
+  accent            String   @default("green") // green | lime | cream (estilo do card)
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   members      ArtistMember[]
@@ -157,19 +160,23 @@ model Show {
   contactName    String? // contato livre quando não há Contact cadastrado
 
   // Combinado (deal)
-  dealType    String  @default("FIXED") // FIXED | DOOR | GUARANTEE_OR_DOOR | FREE | TBD
-  fee         Int? // cachê/garantia em centavos
-  doorPercent Int? // % de bilheteria
-  dealNotes   String? // texto original do combinado
-  hospitality String? // extras: hospedagem, alimentação, backline, aéreos...
+  dealType         String    @default("FIXED") // FIXED | DOOR | GUARANTEE_OR_DOOR | FREE | TBD
+  fee              Int? // cachê/garantia em centavos
+  doorPercent      Int? // % de bilheteria
+  dealNotes        String? // texto original do combinado
+  hospitality      String? // contrapartidas: códigos separados por vírgula (HOSPITALITY em domain.ts)
+  hospitalityNotes String? // observações livres sobre contrapartidas
+  paymentTerms     String    @default("ON_SITE") // ON_SITE (no ato/dia do show) | SCHEDULED (data combinada)
+  paymentDueDate   DateTime? // vencimento quando SCHEDULED
 
   // Bilheteria / divulgação
-  ticketUrl   String?
-  ticketsSold Int?
-  capacity    Int?
-  ticketPrice Int? // centavos
-  posterUrl   String?
-  socialUrl   String?
+  ticketUrl        String?
+  ticketsSold      Int?
+  ticketsUpdatedAt DateTime? // última atualização de vendas
+  capacity         Int?
+  ticketPrice      Int? // centavos
+  posterUrl        String?
+  socialUrl        String?
 
   // Pré-produção e logística
   techSheetUrl String? // ficha técnica / caderno técnico
@@ -193,12 +200,13 @@ model Show {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  artist       Artist        @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  owner        User?         @relation("ShowOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  transactions Transaction[]
-  tasks        Task[]
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  artist        Artist         @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  contact       Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  owner         User?          @relation("ShowOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  transactions  Transaction[]
+  tasks         Task[]
+  ticketReports TicketReport[]
 
   @@index([organizationId, date])
   @@index([artistId])
@@ -218,6 +226,8 @@ model Transaction {
   dueDate        DateTime?
   status         String    @default("PENDING") // PENDING | PAID | CANCELED
   method         String? // PIX | CARD | TRANSFER | CASH | BOLETO
+  source         String? // SHOW_FEE = recebível gerado automaticamente pelo show
+  paidAt         DateTime? // quando foi efetivamente pago (adimplência)
   notes          String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -269,4 +279,20 @@ model Task {
 
   @@index([organizationId, status])
   @@index([assigneeId, status])
+}
+
+// Histórico de vendas de ingressos informadas manualmente (ou por importação)
+model TicketReport {
+  id           String   @id @default(cuid())
+  showId       String
+  sold         Int
+  source       String   @default("MANUAL") // PLATFORM | PROMOTER | ESTIMATE | IMPORT | MANUAL
+  note         String?
+  reportedById String?
+  reportedAt   DateTime @default(now())
+
+  show       Show  @relation(fields: [showId], references: [id], onDelete: Cascade)
+  reportedBy User? @relation(fields: [reportedById], references: [id], onDelete: SetNull)
+
+  @@index([showId, reportedAt])
 }

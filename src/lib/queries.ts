@@ -4,7 +4,7 @@ import { prisma } from './db';
 export async function artistOptions(organizationId: string) {
   return prisma.artist.findMany({
     where: { organizationId },
-    select: { id: true, name: true, slug: true, active: true },
+    select: { id: true, name: true, slug: true, active: true, originState: true, hospitalityLocal: true, hospitalityTravel: true },
     orderBy: { name: 'asc' },
   });
 }

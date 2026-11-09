@@ -1,5 +1,7 @@
 'use client';
 import { useState } from 'react';
+import Alert from '@mui/material/Alert';
+import Typography from '@mui/material/Typography';
 import { useRouter } from 'next/navigation';
 import Autocomplete from '@mui/material/Autocomplete';
 import Button from '@mui/material/Button';
@@ -13,8 +15,12 @@ import TextField from '@mui/material/TextField';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { saveShow } from '@/app/(app)/shows/actions';
-import { BR_STATES, DEAL_TYPES, DEAL_TYPE_LABEL, SHOW_STATUS, SHOW_STATUS_LABEL } from '@/lib/domain';
-import { moneyToInput, toInputDate } from '@/lib/format';
+import {
+  BR_STATES, DEAL_TYPES, DEAL_TYPE_LABEL, DEFAULT_HOSPITALITY_LOCAL, DEFAULT_HOSPITALITY_TRAVEL, PAYMENT_TERMS, PAYMENT_TERMS_LABEL,
+  SHOW_STATUS, SHOW_STATUS_LABEL, parseHospitality, type Hospitality,
+} from '@/lib/domain';
+import { HospitalityPicker } from '@/components/ui/HospitalityPicker';
+import { fmtDate, moneyToInput, toInputDate } from '@/lib/format';
 import { F, FormSection } from '@/components/ui/FormSection';
 import { useFormAction } from '@/components/ui/useFormAction';
 
@@ -34,8 +40,10 @@ export interface ShowFormValues {
   doorPercent?: number | null;
   dealNotes?: string | null;
   hospitality?: string | null;
+  hospitalityNotes?: string | null;
+  paymentTerms?: string;
+  paymentDueDate?: Date | string | null;
   ticketUrl?: string | null;
-  ticketsSold?: number | null;
   capacity?: number | null;
   ticketPrice?: number | null;
   posterUrl?: string | null;
@@ -52,8 +60,28 @@ interface Props {
   open: boolean;
   onClose: () => void;
   initial?: ShowFormValues;
-  artists: { id: string; name: string }[];
+  artists: ArtistForShow[];
   contacts: { id: string; name: string; company: string | null; city: string | null }[];
+}
+
+export interface ArtistForShow {
+  id: string;
+  name: string;
+  originState?: string | null;
+  hospitalityLocal?: string | null;
+  hospitalityTravel?: string | null;
+}
+
+/** Contrapartidas sugeridas: padrão do artista para show na própria UF ou viajando. */
+function suggestHospitality(artist: ArtistForShow | undefined, state: string) {
+  if (!artist || !state || !artist.originState) return null;
+  const travel = artist.originState !== state;
+  const configured = parseHospitality(travel ? artist.hospitalityTravel : artist.hospitalityLocal).items;
+  const items = configured.length ? configured : travel ? DEFAULT_HOSPITALITY_TRAVEL : DEFAULT_HOSPITALITY_LOCAL;
+  const why = travel
+    ? `Show fora de ${artist.originState} (${artist.name} é de ${artist.originState}): contrapartidas de viagem`
+    : `Show em ${state}, mesma UF de ${artist.name}: contrapartidas locais`;
+  return { items, why: configured.length ? why : `${why} (padrão do sistema; configure no cadastro do artista)` };
 }
 
 export function ShowFormDialog({ open, onClose, initial, artists, contacts }: Props) {
@@ -62,6 +90,23 @@ export function ShowFormDialog({ open, onClose, initial, artists, contacts }: Pr
   const router = useRouter();
   const v = initial ?? {};
   const [dealType, setDealType] = useState(v.dealType ?? 'FIXED');
+  const [artistId, setArtistId] = useState(v.artistId ?? '');
+  const [uf, setUf] = useState(v.state ?? '');
+  const [showDate, setShowDate] = useState(toInputDate(v.date));
+  const [terms, setTerms] = useState(v.paymentTerms ?? 'ON_SITE');
+  const initialHosp = parseHospitality(v.hospitality);
+  const [hosp, setHosp] = useState<Hospitality[]>(initialHosp.items);
+  // Edição manual das contrapartidas desliga o pré-preenchimento automático
+  const [hospTouched, setHospTouched] = useState(!!v.id);
+  const [hospHint, setHospHint] = useState<string | null>(null);
+  const applySuggestion = (nextArtist: string, nextUf: string) => {
+    if (hospTouched) return;
+    const sug = suggestHospitality(artists.find((a) => a.id === nextArtist), nextUf);
+    if (sug) {
+      setHosp(sug.items);
+      setHospHint(sug.why);
+    }
+  };
   const [contact, setContact] = useState(contacts.find((c) => c.id === v.contactId) ?? null);
   const { submit, pending, err } = useFormAction(
     (fd) => saveShow(v.id ?? null, fd),
@@ -79,12 +124,12 @@ export function ShowFormDialog({ open, onClose, initial, artists, contacts }: Pr
       <DialogContent dividers>
         <FormSection title="Geral">
           <F span={3}>
-            <TextField select name="artistId" label="Artista" defaultValue={v.artistId ?? ''} required {...err('artistId')}>
+            <TextField select name="artistId" label="Artista" value={artistId} onChange={(e) => { setArtistId(e.target.value); applySuggestion(e.target.value, uf); }} required {...err('artistId')}>
               {artists.map((a) => <MenuItem key={a.id} value={a.id}>{a.name}</MenuItem>)}
             </TextField>
           </F>
           <F span={2}>
-            <TextField type="date" name="date" label="Data" defaultValue={toInputDate(v.date)} required slotProps={{ inputLabel: { shrink: true } }} {...err('date')} />
+            <TextField type="date" name="date" label="Data" value={showDate} onChange={(e) => setShowDate(e.target.value)} required slotProps={{ inputLabel: { shrink: true } }} {...err('date')} />
           </F>
           <F span={1}>
             <TextField select name="status" label="Status" defaultValue={v.status ?? 'CONFIRMED'}>
@@ -94,7 +139,7 @@ export function ShowFormDialog({ open, onClose, initial, artists, contacts }: Pr
           <F span={3}><TextField name="venue" label="Local / casa" defaultValue={str(v.venue)} /></F>
           <F span={2}><TextField name="city" label="Cidade" defaultValue={str(v.city)} /></F>
           <F span={1}>
-            <TextField select name="state" label="UF" defaultValue={v.state ?? ''}>
+            <TextField select name="state" label="UF" value={uf} onChange={(e) => { setUf(e.target.value); applySuggestion(artistId, e.target.value); }}>
               <MenuItem value="">—</MenuItem>
               {BR_STATES.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
             </TextField>
@@ -140,19 +185,67 @@ export function ShowFormDialog({ open, onClose, initial, artists, contacts }: Pr
               slotProps={{ input: { endAdornment: <InputAdornment position="end">%</InputAdornment> }, htmlInput: { min: 0, max: 100 } }}
             />
           </F>
-          <F span={3}><TextField name="hospitality" label="Contrapartidas (hospedagem, alimentação, backline…)" defaultValue={str(v.hospitality)} /></F>
-          <F span={3}><TextField name="dealNotes" label="Combinado (texto livre)" defaultValue={str(v.dealNotes)} /></F>
+          <F span={6}><TextField name="dealNotes" label="Combinado (texto livre)" defaultValue={str(v.dealNotes)} /></F>
+        </FormSection>
+
+        <FormSection title="Pagamento do cachê">
+          <F span={3}>
+            <TextField select name="paymentTerms" label="Quando o contratante paga" value={terms} onChange={(e) => setTerms(e.target.value)}>
+              {PAYMENT_TERMS.map((t) => <MenuItem key={t} value={t}>{PAYMENT_TERMS_LABEL[t]}</MenuItem>)}
+            </TextField>
+          </F>
+          <F span={3}>
+            {terms === 'SCHEDULED' ? (
+              <TextField
+                type="date"
+                name="paymentDueDate"
+                label="Data combinada"
+                defaultValue={toInputDate(v.paymentDueDate)}
+                required
+                slotProps={{ inputLabel: { shrink: true } }}
+                {...err('paymentDueDate')}
+              />
+            ) : (
+              <TextField label="Vencimento" value={showDate ? fmtDate(showDate) : 'Data do show'} disabled />
+            )}
+          </F>
+          <F span={6}>
+            <Typography variant="body2" color="text.secondary">
+              {dealType === 'DOOR'
+                ? 'Só % de bilheteria: o valor é lançado no Financeiro no fechamento, quando a bilheteria for apurada.'
+                : 'O cachê (ou o mínimo garantido) vira uma receita programada no Financeiro com esse vencimento. Se não for paga até a data, aparece como atrasada.'}
+            </Typography>
+          </F>
+        </FormSection>
+
+        <FormSection title="Contrapartidas do contratante">
+          <F span={6}>
+            {hospHint && !hospTouched && <Alert severity="info" sx={{ mb: 1.5, py: 0 }}>{hospHint}</Alert>}
+            <HospitalityPicker name="hospitality" value={hosp} onChange={(x) => { setHosp(x); setHospTouched(true); }} />
+          </F>
+          <F span={6}>
+            <TextField
+              name="hospitalityNotes"
+              label="Detalhes das contrapartidas (opcional)"
+              placeholder="Ex.: hospedagem para 5 pessoas, 2 aéreos + 2 rodoviárias"
+              defaultValue={str(v.hospitalityNotes) || initialHosp.other.join(', ')}
+            />
+          </F>
         </FormSection>
 
         <FormSection title="Bilheteria e divulgação">
-          <F span={3}><TextField name="ticketUrl" label="Link de ingressos" defaultValue={str(v.ticketUrl)} /></F>
-          <F span={1}><TextField name="ticketsSold" type="number" label="Vendidos" defaultValue={num(v.ticketsSold)} /></F>
+          <F span={4}><TextField name="ticketUrl" label="Link de ingressos" defaultValue={str(v.ticketUrl)} /></F>
           <F span={1}><TextField name="capacity" type="number" label="Capacidade" defaultValue={num(v.capacity)} /></F>
           <F span={1}>
             <TextField name="ticketPrice" label="Ingresso" defaultValue={moneyToInput(v.ticketPrice)} slotProps={{ input: { startAdornment: <InputAdornment position="start">R$</InputAdornment> } }} />
           </F>
           <F span={3}><TextField name="posterUrl" label="Cartaz (link)" defaultValue={str(v.posterUrl)} /></F>
           <F span={3}><TextField name="socialUrl" label="Redes sociais (link)" defaultValue={str(v.socialUrl)} /></F>
+          <F span={6}>
+            <Typography variant="body2" color="text.secondary">
+              Os ingressos vendidos são atualizados na página do show, com data e fonte de cada informação.
+            </Typography>
+          </F>
         </FormSection>
 
         <FormSection title="Pré-produção e logística">

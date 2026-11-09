@@ -4,13 +4,13 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
-import LinearProgress from '@mui/material/LinearProgress';
 import Typography from '@mui/material/Typography';
 import { ArrowLeft, MapPin } from 'iconoir-react';
 import { prisma } from '@/lib/db';
 import { can, requireContext } from '@/lib/tenant';
 import { artistOptions, contactOptions } from '@/lib/queries';
-import { DEAL_TYPE_LABEL, TX_CATEGORY_LABEL, type DealType, type TxCategory } from '@/lib/domain';
+import { DEAL_TYPE_LABEL, PAYMENT_TERMS_LABEL, TX_CATEGORY_LABEL, hospitalityLabels, type DealType, type PaymentTerms, type TxCategory } from '@/lib/domain';
+import { TicketSalesCard } from '@/components/shows/TicketSalesCard';
 import { dayjs, fmtDate, isUrl, money } from '@/lib/format';
 import { ResourceLink } from '@/components/ui/ResourceLink';
 import { TxStatusChip } from '@/components/ui/StatusChip';
@@ -46,12 +46,13 @@ export default async function ShowPage({ params }: { params: Promise<{ id: strin
       contact: true,
       owner: { select: { name: true } },
       transactions: { orderBy: { date: 'asc' } },
+      ticketReports: { orderBy: { reportedAt: 'desc' }, take: 30, include: { reportedBy: { select: { name: true } } } },
     },
   });
   if (!show) notFound();
   const [artists, contacts] = await Promise.all([artistOptions(ctx.org.id), contactOptions(ctx.org.id)]);
-  const gross = show.ticketsSold && show.ticketPrice ? show.ticketsSold * show.ticketPrice : null;
-  const occupancy = show.ticketsSold && show.capacity ? Math.min(100, (show.ticketsSold / show.capacity) * 100) : null;
+  const receivable = show.transactions.find((t) => t.source === 'SHOW_FEE') ?? null;
+  const hospitality = hospitalityLabels(show.hospitality);
   const d = dayjs.utc(show.date);
 
   return (
@@ -97,7 +98,29 @@ export default async function ShowPage({ params }: { params: Promise<{ id: strin
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
               <Field label="Modelo" value={DEAL_TYPE_LABEL[show.dealType as DealType] ?? show.dealType} />
               <Field label="Valor" value={<Typography component="span" variant="h4">{dealLabel(show)}</Typography>} />
-              <Field label="Contrapartidas" value={show.hospitality} />
+              <Field
+                label="Pagamento"
+                value={
+                  <Box component="span" sx={{ display: 'inline-flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+                    <span>
+                      {PAYMENT_TERMS_LABEL[show.paymentTerms as PaymentTerms] ?? show.paymentTerms}
+                      {show.paymentTerms === 'SCHEDULED' && show.paymentDueDate ? ` · ${fmtDate(show.paymentDueDate)}` : ''}
+                    </span>
+                    {receivable && <TxStatusChip status={receivable.status} dueDate={receivable.dueDate} date={receivable.date} paidAt={receivable.paidAt} />}
+                  </Box>
+                }
+              />
+            </Box>
+            <Box sx={{ mt: 2.5 }}>
+              <Typography variant="overline" color="text.secondary">Contrapartidas</Typography>
+              {hospitality.length ? (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.5 }}>
+                  {hospitality.map((h) => <Chip key={h} label={h} size="small" color="primary" variant="outlined" />)}
+                </Box>
+              ) : (
+                <Typography>—</Typography>
+              )}
+              {show.hospitalityNotes && <Typography variant="body2" color="text.secondary" mt={1}>{show.hospitalityNotes}</Typography>}
             </Box>
             {show.dealNotes && (
               <Box sx={{ mt: 2, p: 2, borderRadius: 3, bgcolor: 'action.hover' }}>
@@ -109,18 +132,16 @@ export default async function ShowPage({ params }: { params: Promise<{ id: strin
 
           <Card sx={{ p: 3 }}>
             <Typography variant="h5" mb={2}>Bilheteria & divulgação</Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 2 }}>
-              <Field label="Ingressos vendidos" value={show.ticketsSold ?? '—'} />
-              <Field label="Capacidade" value={show.capacity ?? '—'} />
-              <Field label="Preço" value={money(show.ticketPrice)} />
-              <Field label="Bruto estimado" value={money(gross)} />
-            </Box>
-            {occupancy !== null && (
-              <Box sx={{ mt: 2 }}>
-                <LinearProgress variant="determinate" value={occupancy} color="secondary" sx={{ height: 10, borderRadius: 5 }} />
-                <Typography variant="body2" color="text.secondary" mt={0.5}>{occupancy.toFixed(0)}% da capacidade</Typography>
-              </Box>
-            )}
+            <TicketSalesCard
+              showId={show.id}
+              showDate={show.date.toISOString()}
+              capacity={show.capacity}
+              ticketPrice={show.ticketPrice}
+              canEdit={can(ctx, 'PRODUCER')}
+              reports={show.ticketReports.map((r) => ({
+                id: r.id, sold: r.sold, source: r.source, note: r.note, reportedAt: r.reportedAt.toISOString(), reportedBy: r.reportedBy?.name ?? null,
+              }))}
+            />
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mt: 2.5 }}>
               <ResourceLink href={show.ticketUrl} label="Ingressos" icon="link" />
               <ResourceLink href={show.posterUrl} label="Cartaz" icon="photo" />
@@ -161,9 +182,12 @@ export default async function ShowPage({ params }: { params: Promise<{ id: strin
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 1.25 }}>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography fontWeight={700} noWrap>{t.description}</Typography>
-                      <Typography variant="body2" color="text.secondary">{TX_CATEGORY_LABEL[t.category as TxCategory]} · {fmtDate(t.date)}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {TX_CATEGORY_LABEL[t.category as TxCategory]} · vence {fmtDate(t.dueDate ?? t.date)}
+                        {t.paidAt ? ` · pago em ${fmtDate(t.paidAt)}` : ''}
+                      </Typography>
                     </Box>
-                    <TxStatusChip status={t.status} />
+                    <TxStatusChip status={t.status} dueDate={t.dueDate} date={t.date} paidAt={t.paidAt} />
                     <Typography fontWeight={800} color={t.type === 'INCOME' ? 'success.main' : 'error.main'}>
                       {t.type === 'INCOME' ? '+' : '−'} {money(t.amount, true)}
                     </Typography>

@@ -7,7 +7,8 @@ import { Calendar, Coins, MapPin, Microphone } from 'iconoir-react';
 import { prisma } from '@/lib/db';
 import { requireContext } from '@/lib/tenant';
 import { checklistProgress } from '@/lib/queries';
-import { REGION_BY_STATE, SHOW_CHECKLIST } from '@/lib/domain';
+import { REGION_BY_STATE, SHOW_CHECKLIST, TICKETS_STALE_DAYS } from '@/lib/domain';
+import { receivableState } from '@/lib/receivables';
 import { dayjs, money } from '@/lib/format';
 import { artistColor } from '@/lib/colors';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -25,7 +26,7 @@ export default async function DashboardPage() {
   const today = dayjs.utc(dayjs().format('YYYY-MM-DD'));
   const year = now.getUTCFullYear();
 
-  const [shows, activity] = await Promise.all([
+  const [shows, activity, receivables] = await Promise.all([
     prisma.show.findMany({
       where: { organizationId: ctx.org.id, status: { not: 'CANCELED' } },
       include: { artist: { select: { name: true, slug: true } } },
@@ -37,7 +38,16 @@ export default async function DashboardPage() {
       orderBy: { createdAt: 'desc' },
       take: 8,
     }),
+    prisma.transaction.findMany({
+      where: { organizationId: ctx.org.id, type: 'INCOME', status: 'PENDING' },
+      include: { show: { select: { id: true, city: true } }, artist: { select: { name: true } } },
+      orderBy: [{ dueDate: 'asc' }, { date: 'asc' }],
+    }),
   ]);
+  const inAWeek = today.add(7, 'day');
+  const overdueRx = receivables.filter((t) => receivableState(t) === 'OVERDUE');
+  const dueSoonRx = receivables.filter((t) => receivableState(t) === 'PENDING' && !dayjs.utc(t.dueDate ?? t.date).isAfter(inAWeek, 'day'));
+  const overdueTotal = overdueRx.reduce((sum, t) => sum + t.amount, 0);
 
   const inYear = shows.filter((s) => s.date.getUTCFullYear() === year);
   const upcoming = shows.filter((s) => !dayjs.utc(s.date).isBefore(today, 'day'));
@@ -67,7 +77,13 @@ export default async function DashboardPage() {
   // Pendências: shows nos próximos 21 dias com checklist incompleto
   const pending = upcoming
     .filter((s) => dayjs.utc(s.date).diff(today, 'day') <= 21)
-    .map((s) => ({ s, missing: SHOW_CHECKLIST.filter((c) => c.key !== 'chkSettled' && !s[c.key]).map((c) => c.label) }))
+    .map((s) => {
+      const missing: string[] = SHOW_CHECKLIST.filter((c) => c.key !== 'chkSettled' && !s[c.key]).map((c) => c.label);
+      const salesAge = s.ticketsUpdatedAt ? today.diff(dayjs.utc(s.ticketsUpdatedAt), 'day') : null;
+      const sellsTickets = !!s.ticketUrl || s.dealType === 'DOOR' || s.dealType === 'GUARANTEE_OR_DOOR';
+      if (sellsTickets && (salesAge === null || salesAge >= TICKETS_STALE_DAYS)) missing.unshift('atualizar vendas');
+      return { s, missing };
+    })
     .filter((x) => x.missing.length > 0)
     .slice(0, 6);
 
@@ -152,6 +168,33 @@ export default async function DashboardPage() {
                   <Typography variant="body2" sx={{ opacity: 0.8 }}>Falta: {missing.slice(0, 4).join(', ')}{missing.length > 4 ? ` +${missing.length - 4}` : ''}</Typography>
                 </Box>
               ))
+            )}
+          </Card>
+          <Card sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1 }}>
+              <Typography variant="h5">Recebimentos</Typography>
+              <Typography component={Link} href="/financeiro" sx={{ fontWeight: 700, color: 'primary.main', textDecoration: 'none', fontSize: 14 }}>Financeiro →</Typography>
+            </Box>
+            {overdueRx.length > 0 && (
+              <Box component={Link} href="/financeiro?status=OVERDUE" sx={{ display: 'block', textDecoration: 'none', p: 1.5, mb: 1.5, borderRadius: 3, bgcolor: 'error.main', color: '#fff' }}>
+                <Typography fontWeight={800}>{money(overdueTotal)} em atraso</Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>{overdueRx.length} recebimento(s) vencido(s) sem pagamento</Typography>
+              </Box>
+            )}
+            {[...overdueRx, ...dueSoonRx].slice(0, 6).map((t) => {
+              const late = receivableState(t) === 'OVERDUE';
+              return (
+                <Box key={t.id} component={Link} href={t.show ? `/shows/${t.show.id}` : '/financeiro'} sx={{ display: 'flex', gap: 1.5, py: 1, borderTop: 1, borderColor: 'divider', color: 'inherit', textDecoration: 'none' }}>
+                  <Typography fontSize={13} fontWeight={800} sx={{ width: 48, flexShrink: 0, color: late ? 'error.main' : 'text.secondary' }}>
+                    {dayjs.utc(t.dueDate ?? t.date).format('DD/MM')}
+                  </Typography>
+                  <Typography fontSize={14} noWrap sx={{ flex: 1 }}>{t.artist?.name ?? t.description}{t.show?.city ? ` · ${t.show.city}` : ''}</Typography>
+                  <Typography fontSize={14} fontWeight={800}>{money(t.amount)}</Typography>
+                </Box>
+              );
+            })}
+            {overdueRx.length + dueSoonRx.length === 0 && (
+              <Typography color="text.secondary" fontSize={14}>Nada vencido nem vencendo nos próximos 7 dias.</Typography>
             )}
           </Card>
           <Card sx={{ p: 3 }}>

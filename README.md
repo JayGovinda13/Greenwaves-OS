@@ -9,9 +9,9 @@ Sistema de gestão (SaaS multi-tenant) da produtora **Green Wave** — booking, 
 | Módulo | O que faz |
 | --- | --- |
 | **Painel** | KPIs do ano, shows por mês, circulação por região, próximos shows, pendências de produção (próximos 21 dias), ranking de artistas e trilha de atividades. |
-| **Agenda de shows** | Lista (Data Grid com busca/filtros) e calendário mensal. Cada show tem combinado estruturado (cachê fixo, % bilheteria, mínimo ou %), bilheteria, logística e **checklist de produção** espelhando as colunas da planilha (cartaz, ingressos, ficha técnica, redes, passagens, hospedagem, equipe, convidados, fechamento). |
+| **Agenda de shows** | Lista (Data Grid com busca/filtros) e calendário mensal. Cada show tem combinado estruturado (cachê fixo, % bilheteria, mínimo ou %), **forma de pagamento** (no ato ou data combinada, gerando um recebível automático no Financeiro que vira *atrasado* se não for pago), **contrapartidas** pré-preenchidas pelo padrão do artista conforme a UF do show, **vendas de ingressos com histórico datado e fonte** (aviso quando desatualizadas) e checklist de produção. |
 | **Casting** | Cards e página do artista no formato dos slides do portfólio: release, @, materiais (Mídia kit, Rider e mapa de palco, Fotos, Planilha de fechamento), estatísticas, histórico e **dados da banda** (RG/CPF visíveis só para administração). |
-| **Contratantes** | CRM de casas, festivais, coletivos e produtores, com filtro por região/tipo e atalhos de WhatsApp, e-mail e Instagram. |
+| **Contratantes** | CRM de casas, festivais, coletivos e produtores, com filtro por região/tipo, atalhos de WhatsApp, e-mail e Instagram e **adimplência** (pagamentos em dia, com atraso e vencidos dos shows vinculados). |
 | **Financeiro** | Receitas/despesas, a receber, vencidos, fluxo mensal, vínculo com show/artista e links das planilhas de fechamento. |
 | **Configurações** | Dados da produtora, equipe com papéis (RBAC), **importação da planilha .xlsx** e troca de senha. |
 
