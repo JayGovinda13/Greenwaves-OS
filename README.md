@@ -16,7 +16,7 @@ Sistema de gestão (SaaS multi-tenant) da produtora **Green Wave** — booking, 
 | **Configurações** | Dados da produtora, equipe com papéis (RBAC), **importação da planilha .xlsx** e troca de senha. |
 
 ### SaaS / segurança
-- **Multi-tenant**: toda entidade pertence a uma `Organization`; todas as consultas e mutações filtram por `organizationId` da sessão. Cadastro público cria uma nova produtora; usuários podem pertencer a várias e trocar no menu.
+- **Multi-tenant**: toda entidade pertence a uma `Organization`; todas as consultas e mutações filtram por `organizationId` da sessão. Novas produtoras são criadas com `npm run org:create` (o site oferece "Agende uma demo"); usuários podem pertencer a várias e trocar no menu.
 - **RBAC**: `OWNER` (sócio) › `ADMIN` › `PRODUCER` › `VIEWER`, checado em cada Server Action (`requireRole`).
 - Sessão JWT HS256 em cookie `httpOnly`, rotas protegidas por middleware, senhas com bcrypt.
 - Validação de entrada com Zod, valores monetários em centavos, trilha de auditoria (`Activity`).
@@ -47,13 +47,16 @@ O import é idempotente e lê as abas *Shows*, *Shows 2027*, *Dados das bandas*,
 2. **Segredo:** *Settings → Environment Variables* → `AUTH_SECRET` com um valor aleatório longo (`openssl rand -base64 32`), em Production e Preview.
 3. **Redeploy.** O script `vercel-build` gera o Prisma Client e cria/atualiza as tabelas (`prisma db push`) antes do `next build`.
 4. Abra `https://SEU-APP.vercel.app/api/health` — deve responder `"ok": true`.
-5. Crie a conta da produtora em `/cadastro` e importe a planilha em *Configurações → Importar planilha*. (Alternativa: rodar `npm run db:seed` localmente com `DATABASE_URL` do Neon e `SEED_PASSWORD` definido.)
+5. (Opcional) Configure `DEMO_WHATSAPP` e/ou `DEMO_EMAIL` para a página **Agende uma demo** (`/demo`).
+6. Crie as produtoras clientes com `npm run org:create -- --name "Produtora" --owner "Pessoa" --email pessoa@exemplo.com` (rodando localmente com o `DATABASE_URL` do Neon). A pessoa entra com a senha temporária, troca em *Configurações → Minha conta*, baixa o modelo em *Configurações → Importar planilha* e convida a equipe.
+
+> Não há cadastro público: quem chega pelo site vê o formulário de demo, e as contas são criadas por você.
 
 ## Estrutura
 ```
 prisma/            schema, seed, dados do casting e seed sanitizado
 scripts/           importador CLI da planilha
-src/app/(auth)     login, cadastro e actions de sessão
+src/app/(auth)     login, agendamento de demo e actions de sessão
 src/app/(app)      painel, shows, artistas, contatos, financeiro, configurações (+ actions)
 src/components     UI por módulo e componentes de marca (logo, WaveMark)
 src/lib            domínio (zod/enums), tenant/RBAC, sessão, parser de combinado, importador

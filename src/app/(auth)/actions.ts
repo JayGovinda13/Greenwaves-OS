@@ -5,7 +5,6 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from '@/lib/session';
-import { slugify } from '@/lib/format';
 import { getContext } from '@/lib/tenant';
 
 export type AuthState = { error?: string; values?: Record<string, string> } | undefined;
@@ -52,46 +51,6 @@ async function doLogin(_: AuthState, fd: FormData): Promise<AuthState> {
   const token = await signSession({ uid: user.id, oid: user.memberships[0].organizationId });
   (await cookies()).set(SESSION_COOKIE, token, sessionCookieOptions);
   redirect(next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
-}
-
-const signupSchema = z.object({
-  name: z.string().trim().min(2, 'Informe seu nome'),
-  orgName: z.string().trim().min(2, 'Informe o nome da produtora'),
-  email: z.string().trim().toLowerCase().email('E-mail inválido'),
-  password: z.string().min(8, 'A senha precisa ter ao menos 8 caracteres'),
-});
-
-export async function signup(state: AuthState, fd: FormData): Promise<AuthState> {
-  try {
-    return await doSignup(state, fd);
-  } catch (e) {
-    if (e && typeof e === 'object' && 'digest' in e) throw e; // redirect()
-    console.error('[signup]', e);
-    return { error: CONFIG_ERROR, values: keep(fd) };
-  }
-}
-
-async function doSignup(_: AuthState, fd: FormData): Promise<AuthState> {
-  const parsed = signupSchema.safeParse(Object.fromEntries(fd));
-  if (!parsed.success) return { error: parsed.error.issues[0]!.message, values: keep(fd) };
-  const { name, orgName, email, password } = parsed.data;
-  if (await prisma.user.findUnique({ where: { email } })) return { error: 'Já existe uma conta com este e-mail.', values: keep(fd) };
-
-  let slug = slugify(orgName) || 'produtora';
-  if (await prisma.organization.findUnique({ where: { slug } })) slug = `${slug}-${Date.now().toString(36)}`;
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      passwordHash: await bcrypt.hash(password, 10),
-      memberships: { create: { role: 'OWNER', organization: { create: { name: orgName, slug, email } } } },
-    },
-    include: { memberships: true },
-  });
-  const token = await signSession({ uid: user.id, oid: user.memberships[0]!.organizationId });
-  (await cookies()).set(SESSION_COOKIE, token, sessionCookieOptions);
-  redirect('/dashboard');
 }
 
 export async function logout() {

@@ -16,7 +16,8 @@
     "import:xlsx": "tsx scripts/import-xlsx.ts",
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && prisma db push --skip-generate && next build",
-    "db:up": "docker compose up -d db"
+    "db:up": "docker compose up -d db",
+    "org:create": "tsx scripts/create-org.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

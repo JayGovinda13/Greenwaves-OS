@@ -65,7 +65,7 @@ export function SettingsView({ org, members, myRole, canAdmin }: { org: Org; mem
         </Box>
       </Section>
 
-      <Section title="Importar planilha" subtitle="Envie a planilha “Green Wave - Geral” ou o modelo do sistema (.xlsx): artistas, shows, dados das bandas, contatos e fechamentos. Reimportar não duplica registros.">
+      <Section title="Importar planilha" subtitle="Baixe o modelo, preencha e envie o arquivo (.xlsx): artistas, shows, dados das bandas, contatos e fechamentos. Reimportar não duplica registros.">
         {canAdmin ? (
           <Box component="form" onSubmit={importForm.submit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={{ p: 2, borderRadius: 3, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>

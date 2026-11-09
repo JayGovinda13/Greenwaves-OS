@@ -1,7 +1,6 @@
-import { AuthForm } from '../AuthForm';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Criar conta' };
-
+// O cadastro aberto foi substituído pelo agendamento de demonstração.
 export default function SignupPage() {
-  return <AuthForm mode="signup" />;
+  redirect('/demo');
 }
