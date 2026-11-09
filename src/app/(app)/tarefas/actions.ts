@@ -146,3 +146,23 @@ export async function deleteTask(id: string) {
     return { message: 'Tarefa excluída.' };
   });
 }
+
+/** Delega (ou redelega) uma tarefa existente para outra pessoa da equipe. */
+export async function reassignTask(id: string, assigneeId: string) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    const task = await prisma.task.findFirst({ where: { id, organizationId: ctx.org.id } });
+    if (!task) throw new UserError('Tarefa não encontrada');
+    if (task.assigneeId !== ctx.user.id && task.creatorId !== ctx.user.id && !can(ctx, 'ADMIN'))
+      throw new UserError('Só o responsável ou quem criou pode delegar esta tarefa.');
+    const member = await prisma.membership.findFirst({
+      where: { organizationId: ctx.org.id, userId: assigneeId },
+      select: { user: { select: { name: true } } },
+    });
+    if (!member) throw new UserError('Essa pessoa não faz parte da equipe.');
+    await prisma.task.update({ where: { id }, data: { assigneeId } });
+    await logActivity(ctx, 'delegated', 'task', id, `${task.title} → ${member.user.name}`);
+    revalidatePath('/', 'layout');
+    return { message: `Tarefa delegada para ${member.user.name}.` };
+  });
+}
