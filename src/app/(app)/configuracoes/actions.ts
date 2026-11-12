@@ -8,6 +8,7 @@ import { logActivity, requireRole } from '@/lib/tenant';
 import { formToObject, runAction, UserError } from '@/lib/action';
 import { ROLES, ROLE_RANK, type Role } from '@/lib/domain';
 import { importIntoOrganization, parseGreenWaveWorkbook, type ImportSummary } from '@/lib/importers/greenwave-xlsx';
+import { generateToken, TOKEN_TTL_DAYS } from '@/lib/mcp/tokens';
 
 const orgSchema = z.object({
   name: z.string().trim().min(2, 'Informe o nome'),
@@ -116,5 +117,67 @@ export async function importWorkbook(fd: FormData) {
     await logActivity(ctx, 'imported', 'workbook', null, `${file.name}: ${summary.showsCreated} shows novos, ${summary.showsUpdated} atualizados`);
     revalidatePath('/', 'layout');
     return { data: summary, message: 'Planilha importada.' };
+  });
+}
+
+// ---------- Integração com Claude (MCP) ----------
+/** Liga/desliga a integração com IA para a produtora inteira. Só sócios(as): é a decisão do controlador (LGPD). */
+export async function setAiIntegration(enabled: boolean) {
+  return runAction(async () => {
+    const ctx = await requireRole('OWNER');
+    await prisma.organization.update({
+      where: { id: ctx.org.id },
+      data: enabled ? { aiEnabled: true, aiEnabledAt: new Date(), aiEnabledById: ctx.user.id } : { aiEnabled: false },
+    });
+    if (!enabled) {
+      // desligar revoga todas as chaves imediatamente
+      await prisma.apiToken.updateMany({ where: { organizationId: ctx.org.id, revokedAt: null }, data: { revokedAt: new Date() } });
+    }
+    await logActivity(ctx, 'updated', 'organization', ctx.org.id, enabled ? 'Integração com IA (Claude) ativada' : 'Integração com IA desativada e chaves revogadas');
+    revalidatePath('/configuracoes');
+    return { message: enabled ? 'Integração ativada.' : 'Integração desativada; todas as chaves foram revogadas.' };
+  });
+}
+
+const tokenSchema = z.object({
+  name: z.string().trim().min(2, 'Dê um nome para a chave (ex.: Claude no notebook)').max(60),
+  scope: z.enum(['READ', 'WRITE']),
+  ttl: z.coerce.number().refine((n) => (TOKEN_TTL_DAYS as readonly number[]).includes(n), 'Validade inválida'),
+  accept: z.literal('on', { errorMap: () => ({ message: 'Confirme que leu o aviso de privacidade.' }) }),
+});
+
+/** Gera uma chave pessoal. A chave em texto aparece só nesta resposta; guardamos apenas o hash. */
+export async function createApiToken(fd: FormData) {
+  return runAction<{ token: string }>(async () => {
+    const ctx = await requireRole('VIEWER');
+    const org = await prisma.organization.findUniqueOrThrow({ where: { id: ctx.org.id }, select: { aiEnabled: true } });
+    if (!org.aiEnabled) throw new UserError('A integração com IA não está ativada nesta produtora.');
+    const input = tokenSchema.parse(formToObject(fd));
+    if (input.scope === 'WRITE' && ROLE_RANK[ctx.role] < ROLE_RANK.PRODUCER) throw new UserError('Seu papel só permite chaves de leitura.');
+    const active = await prisma.apiToken.count({ where: { userId: ctx.user.id, organizationId: ctx.org.id, revokedAt: null, expiresAt: { gt: new Date() } } });
+    if (active >= 5) throw new UserError('Você já tem 5 chaves ativas. Revogue uma antes de criar outra.');
+    const { token, hash, prefix } = generateToken();
+    await prisma.apiToken.create({
+      data: {
+        organizationId: ctx.org.id, userId: ctx.user.id, name: input.name, prefix, tokenHash: hash, scope: input.scope,
+        expiresAt: new Date(Date.now() + input.ttl * 24 * 3600 * 1000),
+      },
+    });
+    await logActivity(ctx, 'created', 'api_token', null, `Chave "${input.name}" (${input.scope === 'WRITE' ? 'leitura e escrita' : 'leitura'})`);
+    revalidatePath('/configuracoes');
+    return { data: { token }, message: 'Chave criada. Copie agora: ela não será exibida de novo.' };
+  });
+}
+
+export async function revokeApiToken(id: string) {
+  return runAction(async () => {
+    const ctx = await requireRole('VIEWER');
+    const t = await prisma.apiToken.findFirst({ where: { id, organizationId: ctx.org.id } });
+    if (!t) throw new UserError('Chave não encontrada.');
+    if (t.userId !== ctx.user.id && ROLE_RANK[ctx.role] < ROLE_RANK.ADMIN) throw new UserError('Você só pode revogar as suas chaves.');
+    await prisma.apiToken.update({ where: { id }, data: { revokedAt: new Date() } });
+    await logActivity(ctx, 'deleted', 'api_token', id, `Chave "${t.name}" revogada`);
+    revalidatePath('/configuracoes');
+    return { message: 'Chave revogada.' };
   });
 }

@@ -26,6 +26,7 @@
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@modelcontextprotocol/sdk": "1.32",
     "@mui/material": "^7.3.11",
     "@mui/material-nextjs": "^7.3.10",
     "@mui/x-charts": "^8.29.3",

@@ -234,4 +234,4 @@ export default async function DashboardPage() {
 }
 
 const ACTION_LABEL: Record<string, string> = { created: 'cadastrou', updated: 'atualizou', deleted: 'excluiu', imported: 'importou', completed: 'concluiu', delegated: 'delegou' };
-const ENTITY_LABEL: Record<string, string> = { show: 'o show', artist: 'o artista', contact: 'o contato', transaction: 'o lançamento', member: 'o integrante', workbook: 'a planilha', user: 'o usuário', organization: 'a organização', task: 'a tarefa' };
+const ENTITY_LABEL: Record<string, string> = { show: 'o show', artist: 'o artista', contact: 'o contato', transaction: 'o lançamento', member: 'o integrante', workbook: 'a planilha', user: 'o usuário', organization: 'a organização', task: 'a tarefa', api_token: 'a chave de acesso' };

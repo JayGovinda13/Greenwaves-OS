@@ -16,16 +16,20 @@ generator client {
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  plan      String   @default("PRO") // FREE | PRO | ENTERPRISE
-  email     String?
-  phone     String?
-  instagram String?
-  city      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  name          String
+  slug          String    @unique
+  plan          String    @default("PRO") // FREE | PRO | ENTERPRISE
+  email         String?
+  phone         String?
+  instagram     String?
+  city          String?
+  // Integração com IA (MCP): só funciona após aceite explícito de um(a) sócio(a) (LGPD: transparência e responsabilização)
+  aiEnabled     Boolean   @default(false)
+  aiEnabledAt   DateTime?
+  aiEnabledById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   memberships  Membership[]
   artists      Artist[]
@@ -34,6 +38,8 @@ model Organization {
   transactions Transaction[]
   activities   Activity[]
   tasks        Task[]
+  apiTokens    ApiToken[]
+  mcpLogs      McpAuditLog[]
 }
 
 model User {
@@ -51,6 +57,8 @@ model User {
   tasksAssigned Task[]         @relation("TaskAssignee")
   tasksCreated  Task[]         @relation("TaskCreator")
   ticketReports TicketReport[]
+  apiTokens     ApiToken[]
+  mcpLogs       McpAuditLog[]
 }
 
 model Membership {
@@ -321,4 +329,46 @@ model ShowScheduleItem {
   show Show @relation(fields: [showId], references: [id], onDelete: Cascade)
 
   @@index([showId, day, time])
+}
+
+// Chaves pessoais para conectar o Claude (MCP). Guardamos só o hash; a chave aparece uma única vez.
+model ApiToken {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String
+  name           String
+  prefix         String // primeiros caracteres, para identificar a chave na tela
+  tokenHash      String    @unique // SHA-256 da chave
+  scope          String    @default("READ") // READ | WRITE
+  expiresAt      DateTime
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs         McpAuditLog[]
+
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// Registro das operações feitas via Claude (LGPD art. 37). Não guarda o conteúdo dos dados pessoais.
+model McpAuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  tokenId        String?
+  tool           String
+  ok             Boolean  @default(true)
+  summary        String? // ex.: "show cmx… atualizado" — sem dados pessoais
+  personalData   Boolean  @default(false) // a resposta incluiu dados pessoais de terceiros (ex.: telefone de contratante)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  token        ApiToken?    @relation(fields: [tokenId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([tokenId, createdAt])
 }
