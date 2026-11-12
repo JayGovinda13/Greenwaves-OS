@@ -9,6 +9,7 @@ import { AiIntegrationSection } from '@/components/settings/AiIntegrationSection
 import { fmtDate } from '@/lib/format';
 import { PrivacySection } from '@/components/settings/PrivacySection';
 import { RETENTION } from '@/lib/legal';
+import { ExampleLoader } from '@/components/settings/ExampleLoader';
 
 export const metadata = { title: 'Configurações' };
 
@@ -67,6 +68,13 @@ export default async function SettingsPage() {
       </Box>
       <Box sx={{ mt: 3, display: 'grid' }}>
         <PrivacySection isAdmin={isAdmin} dpoName={org.dpoName} dpoEmail={org.dpoEmail} retention={RETENTION} />
+      </Box>
+      {ctx.role === 'OWNER' && (
+        <Box sx={{ mt: 3, display: 'grid' }}>
+          <ExampleLoader />
+        </Box>
+      )}
+      <Box>
       </Box>
     </>
   );

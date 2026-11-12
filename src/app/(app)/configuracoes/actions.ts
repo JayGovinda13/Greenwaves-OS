@@ -9,6 +9,9 @@ import { formToObject, runAction, UserError } from '@/lib/action';
 import { ROLES, ROLE_RANK, type Role } from '@/lib/domain';
 import { importIntoOrganization, parseGreenWaveWorkbook, type ImportSummary } from '@/lib/importers/greenwave-xlsx';
 import { generateToken, TOKEN_TTL_DAYS } from '@/lib/mcp/tokens';
+import { MN_EXAMPLE } from '@/lib/examples/molhoNegro';
+import { CASTING_2026 } from '../../../../prisma/data/casting';
+import { slugify, toCalendarDate } from '@/lib/format';
 
 const orgSchema = z.object({
   name: z.string().trim().min(2, 'Informe o nome'),
@@ -179,5 +182,38 @@ export async function revokeApiToken(id: string) {
     await logActivity(ctx, 'deleted', 'api_token', id, `Chave "${t.name}" revogada`);
     revalidatePath('/configuracoes');
     return { message: 'Chave revogada.' };
+  });
+}
+
+// ---------- Dados de teste ----------
+/** Carrega o exemplo Molho Negro (Maringá + Londrina) com ficha técnica e deslocamentos. Idempotente. */
+export async function loadMolhoNegroExample() {
+  return runAction<{ showIds: string[]; artistId: string }>(async () => {
+    const ctx = await requireRole('OWNER');
+    const orgId = ctx.org.id;
+    let artist = await prisma.artist.findFirst({ where: { organizationId: orgId, slug: MN_EXAMPLE.artistSlug } });
+    if (!artist) {
+      const c = CASTING_2026.find((x) => slugify(x.name) === MN_EXAMPLE.artistSlug)!;
+      const { aliases: _a, ...data } = c;
+      void _a;
+      artist = await prisma.artist.create({ data: { ...data, slug: MN_EXAMPLE.artistSlug, organizationId: orgId } });
+    }
+    const showIds: string[] = [];
+    for (const ex of MN_EXAMPLE.shows) {
+      const date = toCalendarDate(ex.date);
+      const fields = { city: ex.city, state: ex.state, venue: ex.venue, venueAddress: ex.venueAddress, production: ex.production, ...(ex.venueTechContact ? { venueTechContact: ex.venueTechContact } : {}) };
+      const existing = await prisma.show.findFirst({ where: { organizationId: orgId, artistId: artist.id, date } });
+      const show = existing
+        ? await prisma.show.update({ where: { id: existing.id }, data: fields })
+        : await prisma.show.create({ data: { organizationId: orgId, artistId: artist.id, ownerId: ctx.user.id, date, status: 'CONFIRMED', dealType: 'TBD', ...fields } });
+      showIds.push(show.id);
+    }
+    for (const leg of MN_EXAMPLE.legs) {
+      await prisma.travelLeg.deleteMany({ where: { organizationId: orgId, artistId: artist.id, date: leg.date, origin: leg.origin, destination: leg.destination } });
+      await prisma.travelLeg.create({ data: { ...leg, organizationId: orgId, artistId: artist.id } });
+    }
+    await logActivity(ctx, 'imported', 'workbook', null, 'Exemplo Molho Negro (Maringá e Londrina) carregado');
+    revalidatePath('/', 'layout');
+    return { data: { showIds, artistId: artist.id }, message: 'Exemplo carregado.' };
   });
 }
