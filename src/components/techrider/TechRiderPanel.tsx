@@ -34,7 +34,7 @@ export function TechRiderPanel({ artistId, initial, members, canEdit }: {
   if (!rider) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography variant="h5">Monte a ficha técnica</Typography>
+        <Typography variant="h5">Monte o rider da banda</Typography>
         <Typography color="text.secondary" sx={{ maxWidth: 520, mx: 'auto', mt: 1 }}>
           Crie o modelo uma vez: formação, lista de canais, retornos, backline, mapa de palco e necessidades técnicas.
           Cada show usa esse modelo e completa com casa, data e horários na hora de exportar.
@@ -60,10 +60,10 @@ export function TechRiderPanel({ artistId, initial, members, canEdit }: {
         }}
       >
         <Typography color={dirty ? 'warning.main' : 'text.secondary'} fontWeight={dirty ? 700 : 400} sx={{ flex: 1 }}>
-          {dirty ? 'Alterações não salvas' : 'Modelo da ficha técnica deste artista'}
+          {dirty ? 'Alterações não salvas' : 'Rider técnico e mapa de palco deste artista'}
         </Typography>
         <Button component="a" href={`/imprimir/ficha-tecnica/artista/${artistId}`} target="_blank" variant="outlined" startIcon={<Printer />} disabled={dirty}>
-          Exportar ficha
+          Exportar rider
         </Button>
         {canEdit && (
           <Button variant="contained" startIcon={<FloppyDisk />} onClick={save} disabled={!dirty || pending}>

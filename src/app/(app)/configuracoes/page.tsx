@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import { prisma } from '@/lib/db';
-import { can, requireContext } from '@/lib/tenant';
+import { can, requireStaff } from '@/lib/tenant';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SettingsView } from '@/components/settings/SettingsView';
 import type { Role } from '@/lib/domain';
@@ -13,11 +13,11 @@ import { RETENTION } from '@/lib/legal';
 export const metadata = { title: 'Configurações' };
 
 export default async function SettingsPage() {
-  const ctx = await requireContext();
+  const ctx = await requireStaff();
   const [org, members] = await Promise.all([
     prisma.organization.findUniqueOrThrow({ where: { id: ctx.org.id } }),
     prisma.membership.findMany({
-      where: { organizationId: ctx.org.id },
+      where: { organizationId: ctx.org.id, role: { not: 'ARTIST' } },
       include: { user: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: 'asc' },
     }),

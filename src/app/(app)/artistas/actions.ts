@@ -1,4 +1,7 @@
 'use server';
+import crypto from 'node:crypto';
+import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/db';
@@ -86,7 +89,9 @@ export async function deleteMember(artistId: string, memberId: string) {
 /** Salva o modelo de ficha técnica (e mapa de palco) do artista. */
 export async function saveArtistTechRider(artistId: string, data: unknown) {
   return runAction(async () => {
-    const ctx = await requireRole('PRODUCER');
+    // equipe (produção+) ou a própria banda pelo portal
+    const ctx = await requireRole('ARTIST');
+    if (ctx.role === 'ARTIST' ? ctx.artistId !== artistId : !can(ctx, 'PRODUCER')) throw new UserError('Você não tem permissão para esta ação.');
     const artist = await ownedArtist(ctx.org.id, artistId);
     const rider = techRiderSchema.parse(data);
     await prisma.artist.update({ where: { id: artistId }, data: { techRider: rider } });
@@ -105,5 +110,44 @@ export async function revealMemberDocs(artistId: string, memberId: string) {
     if (!m) throw new UserError('Integrante não encontrado');
     await logActivity(ctx, 'viewed', 'member_docs', memberId, `Documentos de ${m.name} (${artist.name}) visualizados`);
     return { data: { rg: decryptField(m.documentRg), cpf: decryptField(m.documentCpf), birthDate: m.birthDate?.toISOString().slice(0, 10) ?? null } };
+  });
+}
+
+// ---------- Portal da banda ----------
+const bandInviteSchema = z.object({
+  name: z.string().trim().min(2, 'Informe o nome'),
+  email: z.string().trim().toLowerCase().email('E-mail inválido'),
+});
+
+/** Dá acesso ao portal da banda (papel ARTIST, restrito a este artista). Mostra a senha temporária uma vez. */
+export async function inviteBandUser(artistId: string, fd: FormData) {
+  return runAction<{ tempPassword?: string }>(async () => {
+    const ctx = await requireRole('ADMIN');
+    const artist = await ownedArtist(ctx.org.id, artistId);
+    const input = bandInviteSchema.parse(formToObject(fd));
+    let user = await prisma.user.findUnique({ where: { email: input.email } });
+    let tempPassword: string | undefined;
+    if (!user) {
+      tempPassword = crypto.randomBytes(6).toString('base64url');
+      user = await prisma.user.create({ data: { name: input.name, email: input.email, passwordHash: await bcrypt.hash(tempPassword, 10) } });
+    }
+    const existing = await prisma.membership.findUnique({ where: { userId_organizationId: { userId: user.id, organizationId: ctx.org.id } } });
+    if (existing) throw new UserError(existing.role === 'ARTIST' ? 'Essa pessoa já tem acesso ao portal de uma banda.' : 'Essa pessoa já faz parte da equipe da produtora.');
+    await prisma.membership.create({ data: { userId: user.id, organizationId: ctx.org.id, role: 'ARTIST', artistId } });
+    await logActivity(ctx, 'created', 'band_access', user.id, `Acesso ao portal: ${input.name} (${artist.name})`);
+    revalidatePath(`/artistas/${artistId}`);
+    return { data: { tempPassword }, message: 'Acesso criado.' };
+  });
+}
+
+export async function removeBandUser(artistId: string, membershipId: string) {
+  return runAction(async () => {
+    const ctx = await requireRole('ADMIN');
+    const m = await prisma.membership.findFirst({ where: { id: membershipId, organizationId: ctx.org.id, role: 'ARTIST', artistId }, include: { user: true } });
+    if (!m) throw new UserError('Acesso não encontrado');
+    await prisma.membership.delete({ where: { id: m.id } });
+    await logActivity(ctx, 'deleted', 'band_access', m.userId, `Acesso ao portal removido: ${m.user.name}`);
+    revalidatePath(`/artistas/${artistId}`);
+    return { message: 'Acesso removido.' };
   });
 }

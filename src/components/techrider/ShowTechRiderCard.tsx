@@ -48,17 +48,17 @@ export function ShowTechRiderCard({ showId, artistId, artistRider, showRider, ve
     <Card sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, flexWrap: 'wrap' }}>
         <Box>
-          <Typography variant="h5">Ficha técnica</Typography>
+          <Typography variant="h5">Rider da banda & mapa de palco</Typography>
           <Box sx={{ mt: 0.75 }}>
             {showRider ? <Chip size="small" color="secondary" label="Personalizada para este show" />
               : artistRider ? <Chip size="small" variant="outlined" label="Usando o modelo do artista" />
-              : <Chip size="small" color="warning" variant="outlined" label="Artista sem ficha técnica" />}
+              : <Chip size="small" color="warning" variant="outlined" label="Artista sem rider" />}
           </Box>
         </Box>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           {effective && (
             <Button component="a" href={`/imprimir/ficha-tecnica/${showId}`} target="_blank" variant="contained" startIcon={<Printer />}>
-              Exportar ficha técnica
+              Exportar rider
             </Button>
           )}
         </Box>
@@ -67,7 +67,7 @@ export function ShowTechRiderCard({ showId, artistId, artistRider, showRider, ve
       {!effective ? (
         <Alert severity="info" sx={{ mt: 2 }}>
           Monte o modelo uma vez no cadastro do artista e ele passa a valer para todos os shows.{' '}
-          <Link href={`/artistas/${artistId}?aba=ficha`} style={{ fontWeight: 700, color: 'inherit' }}>Criar ficha técnica →</Link>
+          <Link href={`/artistas/${artistId}?aba=ficha`} style={{ fontWeight: 700, color: 'inherit' }}>Criar rider →</Link>
         </Alert>
       ) : (
         <>
@@ -99,7 +99,7 @@ export function ShowTechRiderCard({ showId, artistId, artistRider, showRider, ve
 
       {editing && (
         <Dialog open fullScreen onClose={() => setEditing(null)}>
-          <DialogTitle>Ficha técnica deste show</DialogTitle>
+          <DialogTitle>Rider da banda para este show</DialogTitle>
           <DialogContent dividers>
             <Alert severity="info" sx={{ mb: 2 }}>As mudanças valem só para este show. O modelo do artista não é alterado.</Alert>
             <TechRiderEditor value={editing} onChange={setEditing} />

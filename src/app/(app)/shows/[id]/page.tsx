@@ -7,13 +7,17 @@ import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import { ArrowLeft, MapPin } from 'iconoir-react';
 import { prisma } from '@/lib/db';
-import { can, requireContext } from '@/lib/tenant';
+import { can, requireStaff } from '@/lib/tenant';
 import { artistOptions, contactOptions } from '@/lib/queries';
 import { DEAL_TYPE_LABEL, PAYMENT_TERMS_LABEL, TX_CATEGORY_LABEL, hospitalityLabels, type DealType, type PaymentTerms, type TxCategory } from '@/lib/domain';
 import { TicketSalesCard } from '@/components/shows/TicketSalesCard';
 import { ScheduleCard } from '@/components/shows/ScheduleCard';
 import { ShowTechRiderCard } from '@/components/techrider/ShowTechRiderCard';
 import { parseTechRider } from '@/lib/techRider';
+import { parseProduction, TRAVEL_WINDOW_AFTER, TRAVEL_WINDOW_BEFORE } from '@/lib/production';
+import { defaultProduction } from '@/lib/productionDefaults';
+import { ProductionCard } from '@/components/production/ProductionCard';
+import { TravelCard } from '@/components/production/TravelCard';
 import { dayjs, fmtDate, isUrl, money } from '@/lib/format';
 import { ResourceLink } from '@/components/ui/ResourceLink';
 import { TxStatusChip } from '@/components/ui/StatusChip';
@@ -41,7 +45,7 @@ function MaybeLink({ value }: { value: string | null }) {
 
 export default async function ShowPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const ctx = await requireContext();
+  const ctx = await requireStaff();
   const show = await prisma.show.findFirst({
     where: { id, organizationId: ctx.org.id },
     include: {
@@ -54,7 +58,23 @@ export default async function ShowPage({ params }: { params: Promise<{ id: strin
     },
   });
   if (!show) notFound();
-  const [artists, contacts] = await Promise.all([artistOptions(ctx.org.id), contactOptions(ctx.org.id)]);
+  const DAY = 86400000;
+  const showDay = show.date.toISOString().slice(0, 10);
+  const dayOffset = (n: number) => new Date(show.date.getTime() + n * DAY).toISOString().slice(0, 10);
+  const [artists, contacts, legs, nearby, suggestion] = await Promise.all([
+    artistOptions(ctx.org.id),
+    contactOptions(ctx.org.id),
+    prisma.travelLeg.findMany({
+      where: { organizationId: ctx.org.id, artistId: show.artistId, date: { gte: dayOffset(-TRAVEL_WINDOW_BEFORE), lte: dayOffset(TRAVEL_WINDOW_AFTER) } },
+      orderBy: [{ date: 'asc' }, { departure: 'asc' }],
+    }),
+    prisma.show.findMany({
+      where: { organizationId: ctx.org.id, artistId: show.artistId, status: { not: 'CANCELED' }, date: { gte: new Date(show.date.getTime() - 10 * DAY), lte: new Date(show.date.getTime() + 10 * DAY) } },
+      select: { id: true, date: true, city: true, venue: true },
+      orderBy: { date: 'asc' },
+    }),
+    defaultProduction(show.id),
+  ]);
   const receivable = show.transactions.find((t) => t.source === 'SHOW_FEE') ?? null;
   const hospitality = hospitalityLabels(show.hospitality);
   const d = dayjs.utc(show.date);
@@ -97,6 +117,23 @@ export default async function ShowPage({ params }: { params: Promise<{ id: strin
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }, gap: 3, alignItems: 'start' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <ProductionCard
+            showId={show.id}
+            saved={parseProduction(show.production)}
+            suggestion={suggestion}
+            nearby={nearby.map((n) => ({ id: n.id, date: n.date.toISOString().slice(0, 10), city: n.city, venue: n.venue }))}
+            canEdit={can(ctx, 'PRODUCER')}
+          />
+          <TravelCard
+            artistId={show.artistId}
+            showDay={showDay}
+            canEdit={can(ctx, 'PRODUCER')}
+            legs={legs.map((l) => ({
+              id: l.id, mode: l.mode, direction: l.direction, passengers: l.passengers, company: l.company, code: l.code, origin: l.origin,
+              destination: l.destination, date: l.date, departure: l.departure, arrival: l.arrival, boarding: l.boarding,
+              tickets: (Array.isArray(l.tickets) ? l.tickets : []) as { label: string; url: string }[], notes: l.notes,
+            }))}
+          />
           <ScheduleCard
             showId={show.id}
             showDay={show.date.toISOString().slice(0, 10)}

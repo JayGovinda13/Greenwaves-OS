@@ -44,7 +44,7 @@ export function TechRiderSheet({ artistName, rider, show, production }: {
   return (
     <div className="gw-sheet">
       <SheetHeader
-        kind="FICHA TÉCNICA"
+        kind="RIDER TÉCNICO DA BANDA"
         title={artistName}
         subtitle={
           show

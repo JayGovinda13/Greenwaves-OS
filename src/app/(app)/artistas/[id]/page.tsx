@@ -5,7 +5,7 @@ import Card from '@mui/material/Card';
 import Typography from '@mui/material/Typography';
 import { ArrowLeft } from 'iconoir-react';
 import { prisma } from '@/lib/db';
-import { can, requireContext } from '@/lib/tenant';
+import { can, requireStaff } from '@/lib/tenant';
 import { instagramUrl, money } from '@/lib/format';
 import { ResourceLink } from '@/components/ui/ResourceLink';
 import { StatCard } from '@/components/ui/StatCard';
@@ -22,13 +22,14 @@ import { maskDoc } from '@/lib/crypto';
 export default async function ArtistPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ aba?: string }> }) {
   const { id } = await params;
   const { aba } = await searchParams;
-  const ctx = await requireContext();
+  const ctx = await requireStaff();
   const artist = await prisma.artist.findFirst({
     where: { id, organizationId: ctx.org.id },
     include: {
       members: { orderBy: { name: 'asc' } },
       shows: { orderBy: { date: 'asc' } },
       transactions: { select: { type: true, amount: true, status: true } },
+      memberships: { where: { role: 'ARTIST' }, include: { user: { select: { name: true, email: true } } } },
     },
   });
   if (!artist) notFound();
@@ -116,7 +117,9 @@ export default async function ArtistPage({ params, searchParams }: { params: Pro
           canSeeDocs={canSeeDocs}
           canDelete={can(ctx, 'OWNER')}
           techRider={parseTechRider(artist.techRider)}
-          initialTab={aba === 'ficha' ? 3 : 0}
+          initialTab={aba === 'ficha' ? 3 : aba === 'acesso' ? 4 : 0}
+          artistName={artist.name}
+          bandUsers={can(ctx, 'ADMIN') ? artist.memberships.map((m) => ({ membershipId: m.id, name: m.user.name, email: m.user.email, since: m.createdAt.toISOString() })) : null}
         />
       </Card>
     </>

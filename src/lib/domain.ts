@@ -1,15 +1,18 @@
 // Vocabulário de domínio compartilhado (validação, labels em PT-BR e cores de status).
 import { z } from 'zod';
 
+/** Papéis da equipe da produtora. */
 export const ROLES = ['OWNER', 'ADMIN', 'PRODUCER', 'VIEWER'] as const;
-export type Role = (typeof ROLES)[number];
+/** ARTIST = acesso do portal da banda, restrito ao próprio artista (fora da hierarquia da equipe). */
+export type Role = (typeof ROLES)[number] | 'ARTIST';
 export const ROLE_LABEL: Record<Role, string> = {
   OWNER: 'Sócio(a)',
   ADMIN: 'Administração',
   PRODUCER: 'Produção',
   VIEWER: 'Leitura',
+  ARTIST: 'Banda (portal)',
 };
-export const ROLE_RANK: Record<Role, number> = { VIEWER: 0, PRODUCER: 1, ADMIN: 2, OWNER: 3 };
+export const ROLE_RANK: Record<Role, number> = { ARTIST: -1, VIEWER: 0, PRODUCER: 1, ADMIN: 2, OWNER: 3 };
 
 export const SHOW_STATUS = ['PROSPECT', 'NEGOTIATING', 'CONFIRMED', 'DONE', 'CANCELED'] as const;
 export type ShowStatus = (typeof SHOW_STATUS)[number];
@@ -188,6 +191,7 @@ export const artistSchema = z.object({
   riderUrl: optUrl,
   photosUrl: optUrl,
   settlementUrl: optUrl,
+  coverImageUrl: optUrl,
   baseFee: moneyInput,
   hospitalityLocal: optStr,
   hospitalityTravel: optStr,

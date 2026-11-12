@@ -5,7 +5,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import Typography from '@mui/material/Typography';
 import { Calendar, Coins, MapPin, Microphone } from 'iconoir-react';
 import { prisma } from '@/lib/db';
-import { requireContext } from '@/lib/tenant';
+import { requireStaff } from '@/lib/tenant';
 import { checklistProgress } from '@/lib/queries';
 import { REGION_BY_STATE, SHOW_CHECKLIST, TICKETS_STALE_DAYS } from '@/lib/domain';
 import { receivableState } from '@/lib/receivables';
@@ -21,7 +21,7 @@ import { BRAND, FOREST_GRADIENT } from '@/theme/brand';
 export const metadata = { title: 'Painel' };
 
 export default async function DashboardPage() {
-  const ctx = await requireContext();
+  const ctx = await requireStaff();
   const now = new Date();
   const today = dayjs.utc(dayjs().format('YYYY-MM-DD'));
   const year = now.getUTCFullYear();
@@ -234,4 +234,4 @@ export default async function DashboardPage() {
 }
 
 const ACTION_LABEL: Record<string, string> = { created: 'cadastrou', updated: 'atualizou', deleted: 'excluiu', imported: 'importou', completed: 'concluiu', delegated: 'delegou', viewed: 'visualizou', exported: 'exportou', anonymized: 'anonimizou' };
-const ENTITY_LABEL: Record<string, string> = { show: 'o show', artist: 'o artista', contact: 'o contato', transaction: 'o lançamento', member: 'o integrante', workbook: 'a planilha', user: 'o usuário', organization: 'a organização', task: 'a tarefa', api_token: 'a chave de acesso', member_docs: 'os documentos', data_subject: 'dados do titular' };
+const ENTITY_LABEL: Record<string, string> = { show: 'o show', artist: 'o artista', contact: 'o contato', transaction: 'o lançamento', member: 'o integrante', workbook: 'a planilha', user: 'o usuário', organization: 'a organização', task: 'a tarefa', api_token: 'a chave de acesso', member_docs: 'os documentos', data_subject: 'dados do titular', band_access: 'o acesso da banda', travel: 'o deslocamento' };

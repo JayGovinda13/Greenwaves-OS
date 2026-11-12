@@ -3,7 +3,7 @@ import Card from '@mui/material/Card';
 import Typography from '@mui/material/Typography';
 import { ArrowDownLeft, ArrowUpRight, Coins, Wallet } from 'iconoir-react';
 import { prisma } from '@/lib/db';
-import { can, requireContext } from '@/lib/tenant';
+import { can, requireStaff } from '@/lib/tenant';
 import { dayjs, fmtDate, money } from '@/lib/format';
 import { StatCard } from '@/components/ui/StatCard';
 import { receivableState } from '@/lib/receivables';
@@ -15,7 +15,7 @@ export const metadata = { title: 'Financeiro' };
 
 export default async function FinancePage({ searchParams }: { searchParams: Promise<{ show?: string; status?: string }> }) {
   const { show: showFilter, status: statusFilter } = await searchParams;
-  const ctx = await requireContext();
+  const ctx = await requireStaff();
   const year = new Date().getUTCFullYear();
   const [txs, artists, shows] = await Promise.all([
     prisma.transaction.findMany({

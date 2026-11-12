@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { can, requireContext } from '@/lib/tenant';
+import { can, requireStaff } from '@/lib/tenant';
 import { ContactsView } from '@/components/contacts/ContactsView';
 import { receivableState } from '@/lib/receivables';
 
@@ -7,7 +7,7 @@ export const metadata = { title: 'Contratantes' };
 
 export default async function ContactsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
-  const ctx = await requireContext();
+  const ctx = await requireStaff();
   // Adimplência: recebimentos de cachê dos shows vinculados a cada contratante
   const fees = await prisma.transaction.findMany({
     where: { organizationId: ctx.org.id, type: 'INCOME', status: { not: 'CANCELED' }, show: { contactId: { not: null } } },

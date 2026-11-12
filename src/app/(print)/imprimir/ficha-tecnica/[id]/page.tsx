@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
-import { requireContext } from '@/lib/tenant';
+import { canAccessArtist, requireContext } from '@/lib/tenant';
 import { SCHEDULE_KIND_LABEL, type ScheduleKind } from '@/lib/domain';
 import { parseTechRider } from '@/lib/techRider';
 import { scheduleSortKey } from '@/lib/tour';
@@ -8,7 +8,7 @@ import { PrintToolbar } from '@/components/print/PrintToolbar';
 import { TechRiderSheet } from '@/components/techrider/TechRiderSheet';
 import { EmptyState } from '@/components/ui/EmptyState';
 
-export const metadata = { title: 'Ficha técnica' };
+export const metadata = { title: 'Rider da banda' };
 
 /** Horários que interessam à casa/técnica. */
 const TECH_KINDS: ScheduleKind[] = ['ARRIVAL', 'LOAD_IN', 'SOUNDCHECK', 'DOORS', 'SET', 'LOAD_OUT'];
@@ -20,14 +20,14 @@ export default async function ShowTechSheetPage({ params }: { params: Promise<{ 
     where: { id, organizationId: ctx.org.id },
     include: { artist: true, scheduleItems: true, owner: { select: { name: true, phone: true, email: true } } },
   });
-  if (!show) notFound();
+  if (!show || !canAccessArtist(ctx, show.artistId)) notFound();
   const org = await prisma.organization.findUniqueOrThrow({ where: { id: ctx.org.id } });
   const rider = parseTechRider(show.techRider) ?? parseTechRider(show.artist.techRider);
   if (!rider) {
     return (
       <>
         <PrintToolbar backHref={`/shows/${id}`} />
-        <div className="gw-sheet"><EmptyState title="Sem ficha técnica" description="Crie o modelo na aba Ficha técnica do artista." /></div>
+        <div className="gw-sheet"><EmptyState title="Sem rider da banda" description="Crie o rider na aba Rider & mapa de palco do artista." /></div>
       </>
     );
   }

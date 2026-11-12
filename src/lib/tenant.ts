@@ -11,6 +11,8 @@ export interface TenantContext {
   user: { id: string; name: string; email: string };
   org: { id: string; name: string; slug: string; plan: string };
   role: Role;
+  /** Preenchido só para o papel ARTIST (portal da banda). */
+  artistId: string | null;
   orgs: { id: string; name: string; role: Role }[];
 }
 
@@ -30,7 +32,7 @@ export const getContext = cache(async (): Promise<TenantContext | null> => {
       id: true,
       name: true,
       email: true,
-      memberships: { select: { role: true, organization: { select: { id: true, name: true, slug: true, plan: true } } } },
+      memberships: { select: { role: true, artistId: true, organization: { select: { id: true, name: true, slug: true, plan: true } } } },
     },
   });
   if (!user || user.memberships.length === 0) return null;
@@ -39,6 +41,7 @@ export const getContext = cache(async (): Promise<TenantContext | null> => {
     user: { id: user.id, name: user.name, email: user.email },
     org: active.organization,
     role: active.role as Role,
+    artistId: active.role === 'ARTIST' ? active.artistId : null,
     orgs: user.memberships.map((m) => ({ id: m.organization.id, name: m.organization.name, role: m.role as Role })),
   };
 });
@@ -48,6 +51,18 @@ export async function requireContext(): Promise<TenantContext> {
   const ctx = await getContext();
   if (!ctx) redirect('/login');
   return ctx;
+}
+
+/** Área da equipe: o portal da banda não entra aqui. */
+export async function requireStaff(): Promise<TenantContext> {
+  const ctx = await requireContext();
+  if (ctx.role === 'ARTIST') redirect('/banda');
+  return ctx;
+}
+
+/** Garante que um usuário do portal só acesse o próprio artista. */
+export function canAccessArtist(ctx: TenantContext, artistId: string): boolean {
+  return ctx.role !== 'ARTIST' || ctx.artistId === artistId;
 }
 
 export function can(ctx: TenantContext, min: Role): boolean {

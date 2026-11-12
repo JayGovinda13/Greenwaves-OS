@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
-import { requireContext } from '@/lib/tenant';
+import { canAccessArtist, requireContext } from '@/lib/tenant';
 import { dayjs } from '@/lib/format';
 import { buildRoadmap } from '@/lib/tour';
 import { PrintToolbar } from '@/components/print/PrintToolbar';
@@ -16,7 +16,7 @@ export default async function RoadmapPage({ searchParams }: { searchParams: Prom
   const ctx = await requireContext();
   if (!sp.artist) notFound();
   const artist = await prisma.artist.findFirst({ where: { id: sp.artist, organizationId: ctx.org.id }, select: { id: true } });
-  if (!artist) notFound();
+  if (!artist || !canAccessArtist(ctx, artist.id)) notFound();
   const from = isDay(sp.from) ? sp.from! : dayjs().format('YYYY-MM-DD');
   const to = isDay(sp.to) ? sp.to! : dayjs(from).add(60, 'day').format('YYYY-MM-DD');
   const data = await buildRoadmap(ctx.org.id, artist.id, from, to);

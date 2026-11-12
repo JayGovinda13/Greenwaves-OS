@@ -32,6 +32,7 @@ export interface ArtistFormValues {
   photosUrl?: string | null;
   settlementUrl?: string | null;
   baseFee?: number | null;
+  coverImageUrl?: string | null;
   hospitalityLocal?: string | null;
   hospitalityTravel?: string | null;
   accent?: string;
@@ -84,6 +85,7 @@ export function ArtistFormDialog({ open, onClose, initial }: { open: boolean; on
           <F span={3}><TextField name="riderUrl" label="Rider e mapa de palco (link)" defaultValue={s(v.riderUrl)} /></F>
           <F span={3}><TextField name="photosUrl" label="Fotos de divulgação (link)" defaultValue={s(v.photosUrl)} /></F>
           <F span={3}><TextField name="settlementUrl" label="Planilha de fechamento (link)" defaultValue={s(v.settlementUrl)} /></F>
+          <F span={6}><TextField name="coverImageUrl" label="Foto da capa da ficha técnica (link direto da imagem .jpg/.png)" defaultValue={s(v.coverImageUrl)} /></F>
           <F span={2}>
             <TextField name="baseFee" label="Cachê de referência" defaultValue={moneyToInput(v.baseFee)} slotProps={{ input: { startAdornment: <InputAdornment position="start">R$</InputAdornment> } }} />
           </F>

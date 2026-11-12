@@ -26,6 +26,7 @@ import { F, FormSection } from '@/components/ui/FormSection';
 import { useFormAction } from '@/components/ui/useFormAction';
 import { dealLabel } from '@/components/shows/dealLabel';
 import { TechRiderPanel } from '@/components/techrider/TechRiderPanel';
+import { BandAccessPanel, type BandUser } from './BandAccessPanel';
 import type { TechRider } from '@/lib/techRider';
 
 interface ShowItem {
@@ -76,9 +77,9 @@ function MemberDialog({ artistId, member, onClose, canSeeDocs }: { artistId: str
   );
 }
 
-export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDocs, canDelete, techRider, initialTab = 0 }: {
+export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDocs, canDelete, techRider, initialTab = 0, artistName, bandUsers }: {
   artistId: string; shows: ShowItem[]; members: Member[]; canEditMembers: boolean; canSeeDocs: boolean; canDelete: boolean;
-  techRider: TechRider | null; initialTab?: number;
+  techRider: TechRider | null; initialTab?: number; artistName: string; bandUsers: BandUser[] | null;
 }) {
   const [tab, setTab] = useState(initialTab);
   const [editing, setEditing] = useState<Member | 'new' | null>(null);
@@ -129,7 +130,8 @@ export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDoc
           <Tab label={`Próximos shows (${upcoming.length})`} />
           <Tab label={`Histórico (${past.length})`} />
           <Tab label={`Integrantes (${members.length})`} />
-          <Tab label="Ficha técnica & mapa de palco" />
+          <Tab label="Rider & mapa de palco" />
+          {bandUsers && <Tab label={`Acesso da banda (${bandUsers.length})`} />}
         </Tabs>
         {tab === 2 && canEditMembers && (
           <Button size="small" startIcon={<Plus />} onClick={() => setEditing('new')}>Integrante</Button>
@@ -177,6 +179,7 @@ export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDoc
             </Box>
           </Box>
         ))}
+      {tab === 4 && bandUsers && <BandAccessPanel artistId={artistId} artistName={artistName} users={bandUsers} />}
       {tab === 3 && (
         <TechRiderPanel artistId={artistId} initial={techRider} members={members.map((m) => ({ name: m.name, role: m.role }))} canEdit={canEditMembers} />
       )}

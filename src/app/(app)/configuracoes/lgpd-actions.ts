@@ -121,7 +121,7 @@ export async function saveDpo(fd: FormData) {
 /** Baixar os próprios dados (acesso e portabilidade). */
 export async function exportMyData() {
   return runAction<{ filename: string; json: string }>(async () => {
-    const ctx = await requireRole('VIEWER');
+    const ctx = await requireRole('ARTIST');
     const [user, memberships, tasks, tokens, activity] = await Promise.all([
       prisma.user.findUniqueOrThrow({ where: { id: ctx.user.id }, select: { name: true, email: true, phone: true, createdAt: true } }),
       prisma.membership.findMany({ where: { userId: ctx.user.id }, select: { role: true, createdAt: true, organization: { select: { name: true } } } }),
@@ -141,7 +141,7 @@ export async function exportMyData() {
 /** Exclusão da própria conta (art. 18, VI). Bloqueia se a pessoa for a única sócia de uma produtora com equipe. */
 export async function deleteMyAccount(confirmEmail: string) {
   return runAction(async () => {
-    const ctx = await requireRole('VIEWER');
+    const ctx = await requireRole('ARTIST');
     if (confirmEmail.trim().toLowerCase() !== ctx.user.email.toLowerCase()) throw new UserError('Digite seu e-mail exatamente para confirmar.');
     const owned = await prisma.membership.findMany({ where: { userId: ctx.user.id, role: 'OWNER' }, select: { organizationId: true, organization: { select: { name: true } } } });
     for (const o of owned) {

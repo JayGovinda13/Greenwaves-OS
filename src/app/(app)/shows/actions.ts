@@ -8,6 +8,7 @@ import { SHOW_CHECKLIST, SHOW_STATUS, scheduleItemSchema, showSchema, ticketRepo
 import { syncShowReceivable } from '@/lib/receivables';
 import { defaultSchedule, legToShow } from '@/lib/tour';
 import { techRiderSchema } from '@/lib/techRider';
+import { productionSchema, travelLegSchema } from '@/lib/production';
 import { Prisma } from '@prisma/client';
 import { fmtDate, toCalendarDate } from '@/lib/format';
 
@@ -190,5 +191,46 @@ export async function saveShowTechInfo(showId: string, fd: FormData) {
     });
     revalidatePath(`/shows/${showId}`);
     return { message: 'Informações técnicas salvas.' };
+  });
+}
+
+// ---------- Ficha técnica de produção ----------
+export async function saveShowProduction(showId: string, data: unknown) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    await ownedShow(ctx.org.id, showId);
+    const production = productionSchema.parse(data);
+    await prisma.show.update({ where: { id: showId }, data: { production } });
+    await logActivity(ctx, 'updated', 'show', showId, 'Ficha técnica de produção atualizada');
+    revalidatePath(`/shows/${showId}`);
+    return { message: 'Ficha técnica salva.' };
+  });
+}
+
+// ---------- Deslocamentos ----------
+export async function saveTravelLeg(artistId: string, legId: string | null, data: unknown) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    const artist = await prisma.artist.findFirst({ where: { id: artistId, organizationId: ctx.org.id }, select: { id: true } });
+    if (!artist) throw new UserError('Artista não encontrado');
+    const input = travelLegSchema.parse(data);
+    if (legId) {
+      const r = await prisma.travelLeg.updateMany({ where: { id: legId, organizationId: ctx.org.id }, data: input });
+      if (!r.count) throw new UserError('Deslocamento não encontrado');
+    } else await prisma.travelLeg.create({ data: { ...input, organizationId: ctx.org.id, artistId } });
+    await logActivity(ctx, legId ? 'updated' : 'created', 'travel', legId, `${input.origin} → ${input.destination} (${input.date})`);
+    revalidatePath('/shows/[id]', 'page');
+    revalidatePath('/banda');
+    return { message: 'Deslocamento salvo.' };
+  });
+}
+
+export async function deleteTravelLeg(legId: string) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    const r = await prisma.travelLeg.deleteMany({ where: { id: legId, organizationId: ctx.org.id } });
+    if (!r.count) throw new UserError('Deslocamento não encontrado');
+    revalidatePath('/shows/[id]', 'page');
+    return { message: 'Deslocamento removido.' };
   });
 }

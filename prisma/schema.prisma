@@ -43,6 +43,7 @@ model Organization {
   tasks        Task[]
   apiTokens    ApiToken[]
   mcpLogs      McpAuditLog[]
+  travelLegs   TravelLeg[]
 }
 
 model User {
@@ -69,9 +70,11 @@ model Membership {
   role           String       @default("PRODUCER") // OWNER | ADMIN | PRODUCER | VIEWER
   userId         String
   organizationId String
+  artistId       String? // papel ARTIST: acesso do portal da banda, restrito a este artista
   createdAt      DateTime     @default(now())
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  artist         Artist?      @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -97,6 +100,7 @@ model Artist {
   hospitalityLocal  String? // contrapartidas padrão na própria UF (códigos separados por vírgula)
   hospitalityTravel String? // contrapartidas padrão quando viaja para outra UF
   techRider         Json? // modelo de ficha técnica do artista (ver src/lib/techRider.ts)
+  coverImageUrl     String? // foto da capa da ficha técnica (link direto da imagem)
   accent            String   @default("green") // green | lime | cream (estilo do card)
   active            Boolean  @default(true)
   createdAt         DateTime @default(now())
@@ -106,6 +110,8 @@ model Artist {
   members      ArtistMember[]
   shows        Show[]
   transactions Transaction[]
+  memberships  Membership[]
+  travelLegs   TravelLeg[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -173,6 +179,7 @@ model Show {
   techRider        Json? // ficha técnica personalizada para este show (null = usa o modelo do artista)
   venueTechContact String? // técnico de som / contato técnico da casa
   techNotes        String? // observações técnicas deste show
+  production       Json? // dados da ficha técnica de produção (ver src/lib/production.ts)
   eventName        String?
   status           String   @default("CONFIRMED") // PROSPECT | NEGOTIATING | CONFIRMED | DONE | CANCELED
   contactName      String? // contato livre quando não há Contact cadastrado
@@ -384,4 +391,31 @@ model LoginAttempt {
   createdAt DateTime @default(now())
 
   @@index([emailHash, createdAt])
+}
+
+// Deslocamentos da banda (ônibus, voo, van…) — entram na ficha técnica dos shows próximos à data
+model TravelLeg {
+  id             String   @id @default(cuid())
+  organizationId String
+  artistId       String
+  mode           String   @default("BUS") // BUS | FLIGHT | VAN | CAR | OTHER
+  direction      String   @default("IDA") // IDA | VOLTA | TRECHO
+  passengers     String? // ex.: "João, Paulo e Raony"
+  company        String? // companhia / viação
+  code           String? // linha / número do voo
+  origin         String
+  destination    String
+  date           String // YYYY-MM-DD
+  departure      String? // HH:mm
+  arrival        String? // HH:mm
+  boarding       String? // HH:mm
+  tickets        Json? // [{ label, url }]
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  artist       Artist       @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, artistId, date])
 }

@@ -1,12 +1,12 @@
 import { prisma } from '@/lib/db';
-import { requireContext, can } from '@/lib/tenant';
+import { requireStaff, can } from '@/lib/tenant';
 import { artistOptions, contactOptions, checklistProgress } from '@/lib/queries';
 import { ShowsView, type ShowRow } from '@/components/shows/ShowsView';
 
 export const metadata = { title: 'Agenda de shows' };
 
 export default async function ShowsPage() {
-  const ctx = await requireContext();
+  const ctx = await requireStaff();
   const [shows, artists, contacts] = await Promise.all([
     prisma.show.findMany({
       where: { organizationId: ctx.org.id },

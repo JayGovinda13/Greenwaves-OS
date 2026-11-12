@@ -59,7 +59,7 @@ export async function inviteMember(fd: FormData) {
 export async function changeRole(membershipId: string, role: Role) {
   return runAction(async () => {
     const ctx = await requireRole('ADMIN');
-    if (!ROLES.includes(role)) throw new UserError('Papel inválido');
+    if (!(ROLES as readonly string[]).includes(role)) throw new UserError('Papel inválido');
     const m = await prisma.membership.findFirst({ where: { id: membershipId, organizationId: ctx.org.id } });
     if (!m) throw new UserError('Membro não encontrado');
     if (m.userId === ctx.user.id) throw new UserError('Você não pode alterar o próprio papel.');
@@ -91,7 +91,7 @@ const passwordSchema = z.object({
 
 export async function changePassword(fd: FormData) {
   return runAction(async () => {
-    const ctx = await requireRole('VIEWER');
+    const ctx = await requireRole('ARTIST');
     const input = passwordSchema.parse(formToObject(fd));
     const user = await prisma.user.findUniqueOrThrow({ where: { id: ctx.user.id } });
     if (!(await bcrypt.compare(input.current, user.passwordHash))) throw new UserError('Senha atual incorreta.');

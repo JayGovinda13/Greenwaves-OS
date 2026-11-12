@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
-import { can, requireContext } from '@/lib/tenant';
+import { can, canAccessArtist, requireContext } from '@/lib/tenant';
 import {
   DEAL_TYPE_LABEL, PAYMENT_TERMS_LABEL, SCHEDULE_KIND_LABEL, SHOW_CHECKLIST, hospitalityLabels,
   type DealType, type PaymentTerms, type ScheduleKind,
@@ -33,12 +33,13 @@ const mapsLink = (q: string) => `https://www.google.com/maps/search/?api=1&query
 export default async function RoadbookPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ valores?: string }> }) {
   const { id } = await params;
   const { valores } = await searchParams;
-  const showMoney = valores === '1';
   const ctx = await requireContext();
+  // portal da banda nunca vê valores
+  const showMoney = valores === '1' && ctx.role !== 'ARTIST';
   // preferências/restrições podem ser dado sensível: só para quem produz (LGPD art. 11)
   const canSeeRestrictions = can(ctx, 'PRODUCER');
-  const exists = await prisma.show.findFirst({ where: { id, organizationId: ctx.org.id }, select: { id: true } });
-  if (!exists) notFound();
+  const exists = await prisma.show.findFirst({ where: { id, organizationId: ctx.org.id }, select: { id: true, artistId: true } });
+  if (!exists || !canAccessArtist(ctx, exists.artistId)) notFound();
 
   const [{ leg }, show, org] = await Promise.all([
     legToShow(ctx.org.id, id),
@@ -68,8 +69,8 @@ export default async function RoadbookPage({ params, searchParams }: { params: P
   return (
     <>
       <PrintToolbar
-        backHref={`/shows/${id}`}
-        toggles={[{ label: 'Incluir valores (cachê e pagamento)', href: `?valores=${showMoney ? '0' : '1'}`, active: showMoney }]}
+        backHref={ctx.role === 'ARTIST' ? '/banda' : `/shows/${id}`}
+        toggles={ctx.role === 'ARTIST' ? [] : [{ label: 'Incluir valores (cachê e pagamento)', href: `?valores=${showMoney ? '0' : '1'}`, active: showMoney }]}
       />
       <div className="gw-sheet">
         <SheetHeader

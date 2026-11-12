@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Typography from '@mui/material/Typography';
 import { prisma } from '@/lib/db';
-import { can, requireContext } from '@/lib/tenant';
+import { can, requireStaff } from '@/lib/tenant';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { WaveMark } from '@/components/brand/WaveMark';
@@ -14,7 +14,7 @@ import { nameFontSize } from '@/components/artists/nameSize';
 export const metadata = { title: 'Casting' };
 
 export default async function ArtistsPage() {
-  const ctx = await requireContext();
+  const ctx = await requireStaff();
   const now = new Date();
   const artists = await prisma.artist.findMany({
     where: { organizationId: ctx.org.id },

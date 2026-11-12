@@ -26,6 +26,7 @@ const ROLE_HELP: Record<Role, string> = {
   ADMIN: 'Financeiro, documentos da banda, equipe e importações.',
   PRODUCER: 'Agenda, checklist, contratantes e integrantes (sem documentos).',
   VIEWER: 'Apenas leitura.',
+  ARTIST: 'Portal da banda: só os próprios shows e documentos, sem valores.',
 };
 
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
