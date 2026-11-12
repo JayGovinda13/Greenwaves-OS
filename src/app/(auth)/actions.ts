@@ -1,6 +1,7 @@
 'use server';
 import bcrypt from 'bcryptjs';
-import { cookies } from 'next/headers';
+import crypto from 'node:crypto';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
@@ -41,13 +42,22 @@ async function doLogin(_: AuthState, fd: FormData): Promise<AuthState> {
   const parsed = loginSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { error: parsed.error.issues[0]!.message, values: keep(fd) };
   const { email, password, next } = parsed.data;
+  // Proteção contra força bruta (LGPD art. 46): 8 falhas em 15 minutos bloqueiam o e-mail temporariamente
+  const emailHash = crypto.createHash('sha256').update(email).digest('hex');
+  const recentFails = await prisma.loginAttempt.count({ where: { emailHash, createdAt: { gte: new Date(Date.now() - 15 * 60_000) } } });
+  if (recentFails >= 8) return { error: 'Muitas tentativas seguidas. Aguarde 15 minutos e tente de novo.', values: keep(fd) };
   const user = await prisma.user.findUnique({
     where: { email },
     include: { memberships: { orderBy: { createdAt: 'asc' }, take: 1 } },
   });
   // compara mesmo sem usuário para não vazar por timing quais e-mails existem
   const ok = await bcrypt.compare(password, user?.passwordHash ?? '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinva');
-  if (!user || !ok || !user.memberships[0]) return { error: 'E-mail ou senha incorretos.', values: keep(fd) };
+  if (!user || !ok || !user.memberships[0]) {
+    const ip = (await headers()).get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+    await prisma.loginAttempt.create({ data: { emailHash, ip } });
+    return { error: 'E-mail ou senha incorretos.', values: keep(fd) };
+  }
+  await prisma.loginAttempt.deleteMany({ where: { emailHash } });
   const token = await signSession({ uid: user.id, oid: user.memberships[0].organizationId });
   (await cookies()).set(SESSION_COOKIE, token, sessionCookieOptions);
   redirect(next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');

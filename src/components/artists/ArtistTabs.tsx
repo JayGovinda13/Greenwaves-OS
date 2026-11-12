@@ -15,9 +15,10 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
-import { EditPencil, Plus } from 'iconoir-react';
-import { deleteArtist, deleteMember, saveMember } from '@/app/(app)/artistas/actions';
-import { dayjs, fmtDate, toInputDate } from '@/lib/format';
+import { EditPencil, Eye, Plus } from 'iconoir-react';
+import { deleteArtist, deleteMember, revealMemberDocs, saveMember } from '@/app/(app)/artistas/actions';
+import { useToast } from '@/components/ui/Toast';
+import { dayjs, fmtDate } from '@/lib/format';
 import { ShowStatusChip } from '@/components/ui/StatusChip';
 import { ConfirmButton } from '@/components/ui/ConfirmButton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -46,20 +47,25 @@ function MemberDialog({ artistId, member, onClose, canSeeDocs }: { artistId: str
         <FormSection title="Dados da banda">
           <F span={4}><TextField name="name" label="Nome completo" required defaultValue={s(member?.name)} {...err('name')} /></F>
           <F span={2}><TextField name="role" label="Função" defaultValue={s(member?.role)} /></F>
-          <F span={2}><TextField name="birthDate" type="date" label="Nascimento" defaultValue={toInputDate(member?.birthDate)} slotProps={{ inputLabel: { shrink: true } }} /></F>
           {canSeeDocs ? (
             <>
-              <F span={2}><TextField name="documentRg" label="RG" defaultValue={s(member?.documentRg)} /></F>
-              <F span={2}><TextField name="documentCpf" label="CPF" defaultValue={s(member?.documentCpf)} /></F>
+              <F span={2}><TextField name="birthDate" type="date" label="Nascimento" slotProps={{ inputLabel: { shrink: true } }} helperText={member?.birthDate ? 'Vazio = manter' : undefined} /></F>
+              <F span={2}><TextField name="documentRg" label="RG" placeholder={member?.documentRg ? `manter ${member.documentRg}` : ''} helperText="Guardado criptografado" /></F>
+              <F span={2}><TextField name="documentCpf" label="CPF" placeholder={member?.documentCpf ? `manter ${member.documentCpf}` : ''} helperText="Vazio = manter o atual" /></F>
             </>
           ) : (
-            <>
-              <F span={4}><Alert severity="info" sx={{ py: 0 }}>Documentos visíveis apenas para administração.</Alert></F>
-            </>
+            <F span={4}><Alert severity="info" sx={{ py: 0 }}>Documentos e nascimento: só a administração.</Alert></F>
           )}
           <F span={3}><TextField name="phone" label="Telefone" defaultValue={s(member?.phone)} /></F>
           <F span={3}><TextField name="email" type="email" label="E-mail" defaultValue={s(member?.email)} /></F>
-          <F span={6}><TextField name="restrictions" label="Preferências / restrições" multiline minRows={2} defaultValue={s(member?.restrictions)} /></F>
+          <F span={6}><TextField
+            name="restrictions"
+            label="Preferências / restrições"
+            multiline
+            minRows={2}
+            defaultValue={s(member?.restrictions)}
+            helperText="Descreva só a necessidade (ex.: vegano, sem glúten, sem amendoim). Não registre diagnósticos: dado de saúde é sensível (LGPD art. 11)."
+          /></F>
         </FormSection>
       </DialogContent>
       <DialogActions sx={{ px: 3, py: 2 }}>
@@ -76,6 +82,13 @@ export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDoc
 }) {
   const [tab, setTab] = useState(initialTab);
   const [editing, setEditing] = useState<Member | 'new' | null>(null);
+  const [revealed, setRevealed] = useState<{ name: string; rg: string | null; cpf: string | null; birthDate: string | null } | null>(null);
+  const toast = useToast();
+  const reveal = async (m: Member) => {
+    const r = await revealMemberDocs(artistId, m.id);
+    if (r.ok && r.data) setRevealed({ name: m.name, ...r.data });
+    else if (!r.ok) toast(r.error, 'error');
+  };
   const today = dayjs().format('YYYY-MM-DD');
   const upcoming = shows.filter((s) => s.date.slice(0, 10) >= today);
   const past = shows.filter((s) => s.date.slice(0, 10) < today).reverse();
@@ -140,7 +153,14 @@ export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDoc
                     <td>{m.role ?? '—'}</td>
                     <td>{fmtDate(m.birthDate)}</td>
                     <td>{m.documentRg ?? '—'}</td>
-                    <td>{m.documentCpf ?? '—'}</td>
+                    <td>
+                      {m.documentCpf ?? '—'}
+                      {canSeeDocs && (m.documentRg || m.documentCpf) && (
+                        <Tooltip title="Mostrar documentos (fica registrado)">
+                          <IconButton size="small" onClick={() => reveal(m)} aria-label="Mostrar documentos"><Eye width={16} /></IconButton>
+                        </Tooltip>
+                      )}
+                    </td>
                     <td>{[m.phone, m.email].filter(Boolean).join(' · ') || '—'}</td>
                     <td>{m.restrictions ?? '—'}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
@@ -170,6 +190,19 @@ export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDoc
             buttonProps={{ size: 'small' }}
           />
         </Box>
+      )}
+      {revealed && (
+        <Dialog open onClose={() => setRevealed(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>Documentos</DialogTitle>
+          <DialogContent dividers>
+            <Typography fontWeight={800} mb={1}>{revealed.name}</Typography>
+            <Typography>RG: <b>{revealed.rg ?? '—'}</b></Typography>
+            <Typography>CPF: <b>{revealed.cpf ?? '—'}</b></Typography>
+            <Typography>Nascimento: <b>{revealed.birthDate ? fmtDate(revealed.birthDate) : '—'}</b></Typography>
+            <Alert severity="info" sx={{ mt: 2 }}>Esta visualização foi registrada. Use apenas para a finalidade da produção (passagens, hospedagem, listas).</Alert>
+          </DialogContent>
+          <DialogActions><Button onClick={() => setRevealed(null)}>Fechar</Button></DialogActions>
+        </Dialog>
       )}
       {editing && (
         <MemberDialog artistId={artistId} member={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} canSeeDocs={canSeeDocs} />

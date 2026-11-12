@@ -6,6 +6,7 @@ import ExcelJS from 'exceljs';
 import type { PrismaClient } from '@prisma/client';
 import { parseDeal, splitContact } from '../deal';
 import { syncShowReceivable } from '../receivables';
+import { encryptField } from '../crypto';
 import { REGION_BY_STATE } from '../domain';
 import { slugify } from '../format';
 import { CASTING_2026 } from '../../../prisma/data/casting';
@@ -572,7 +573,12 @@ export async function importIntoOrganization(
     const exists = await db.artistMember.findFirst({ where: { artistId: aId, name: m.name }, select: { id: true } });
     const { artist: _ignored, birthDate, ...rest } = m;
     void _ignored;
-    const data2 = { ...rest, birthDate: birthDate ? new Date(`${birthDate}T12:00:00.000Z`) : null };
+    const data2 = {
+      ...rest,
+      documentRg: encryptField(rest.documentRg),
+      documentCpf: encryptField(rest.documentCpf),
+      birthDate: birthDate ? new Date(`${birthDate}T12:00:00.000Z`) : null,
+    };
     if (exists) await db.artistMember.update({ where: { id: exists.id }, data: data2 });
     else {
       await db.artistMember.create({ data: { artistId: aId, ...data2 } });

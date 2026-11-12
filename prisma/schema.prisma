@@ -25,6 +25,9 @@ model Organization {
   instagram     String?
   city          String?
   // Integração com IA (MCP): só funciona após aceite explícito de um(a) sócio(a) (LGPD: transparência e responsabilização)
+  // LGPD: encarregado(a) pelo tratamento de dados pessoais desta produtora (art. 41)
+  dpoName       String?
+  dpoEmail      String?
   aiEnabled     Boolean   @default(false)
   aiEnabledAt   DateTime?
   aiEnabledById String?
@@ -371,4 +374,14 @@ model McpAuditLog {
 
   @@index([organizationId, createdAt])
   @@index([tokenId, createdAt])
+}
+
+// Tentativas de login malsucedidas (proteção contra força bruta — LGPD art. 46). Guardamos só o hash do e-mail.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  emailHash String
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([emailHash, createdAt])
 }

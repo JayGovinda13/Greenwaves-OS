@@ -32,6 +32,9 @@ export function AuthForm({ next }: { next?: string }) {
           Quer usar o Greenwaves OS na sua produtora?{' '}
           <Link href="/demo" style={{ color: 'inherit', fontWeight: 700 }}>Agende uma demo</Link>
         </Typography>
+        <Typography variant="caption" color="text.secondary" textAlign="center">
+          <Link href="/privacidade" style={{ color: 'inherit' }}>Política de Privacidade</Link>
+        </Typography>
       </Stack>
     </Box>
   );

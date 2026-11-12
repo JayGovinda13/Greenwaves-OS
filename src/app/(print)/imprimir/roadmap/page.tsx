@@ -72,7 +72,7 @@ export default async function RoadmapPage({ searchParams }: { searchParams: Prom
         />
         <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#888', borderTop: '1px solid #E6E0D2', paddingTop: 6 }}>
           <span>{ctx.org.name} · Greenwaves OS</span>
-          <span>Gerado em {dayjs().format('DD/MM/YYYY HH:mm')} · ≈ distâncias e tempos estimados quando não há rota calculada</span>
+          <span>Gerado em {dayjs().format('DD/MM/YYYY HH:mm')} · contém dados pessoais: uso restrito à produção (LGPD) · ≈ distâncias e tempos estimados quando não há rota calculada</span>
         </div>
       </div>
     </>

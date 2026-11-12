@@ -6,6 +6,7 @@ import { can, logActivity, requireRole } from '@/lib/tenant';
 import { formToObject, runAction, UserError } from '@/lib/action';
 import { artistSchema, memberSchema } from '@/lib/domain';
 import { techRiderSchema } from '@/lib/techRider';
+import { decryptField, encryptField } from '@/lib/crypto';
 import { slugify, toCalendarDate } from '@/lib/format';
 
 export async function saveArtist(id: string | null, fd: FormData) {
@@ -53,10 +54,15 @@ export async function saveMember(artistId: string, memberId: string | null, fd: 
     const ctx = await requireRole('PRODUCER');
     const artist = await ownedArtist(ctx.org.id, artistId);
     const input = memberSchema.parse(formToObject(fd));
-    const { documentRg, documentCpf, ...rest } = input;
-    // Documentos (RG/CPF) só podem ser lidos/alterados por administração
-    const docs = can(ctx, 'ADMIN') ? { documentRg, documentCpf } : {};
-    const data = { ...rest, ...docs, birthDate: input.birthDate ? toCalendarDate(input.birthDate) : null };
+    const { documentRg, documentCpf, birthDate, ...rest } = input;
+    // Documentos e nascimento: só a administração grava; campo vazio = manter o valor atual. RG/CPF cifrados (LGPD art. 46).
+    const docs: Record<string, unknown> = {};
+    if (can(ctx, 'ADMIN')) {
+      if (documentRg) docs.documentRg = encryptField(documentRg);
+      if (documentCpf) docs.documentCpf = encryptField(documentCpf);
+      if (birthDate) docs.birthDate = toCalendarDate(birthDate);
+    }
+    const data = { ...rest, ...docs };
     if (memberId) {
       const r = await prisma.artistMember.updateMany({ where: { id: memberId, artistId }, data });
       if (!r.count) throw new UserError('Integrante não encontrado');
@@ -87,5 +93,17 @@ export async function saveArtistTechRider(artistId: string, data: unknown) {
     await logActivity(ctx, 'updated', 'artist', artistId, `Ficha técnica de ${artist.name}`);
     revalidatePath(`/artistas/${artistId}`);
     return { message: 'Ficha técnica salva.' };
+  });
+}
+
+/** Revela RG/CPF de um integrante para a administração. Cada visualização fica registrada (LGPD art. 37). */
+export async function revealMemberDocs(artistId: string, memberId: string) {
+  return runAction<{ rg: string | null; cpf: string | null; birthDate: string | null }>(async () => {
+    const ctx = await requireRole('ADMIN');
+    const artist = await ownedArtist(ctx.org.id, artistId);
+    const m = await prisma.artistMember.findFirst({ where: { id: memberId, artistId } });
+    if (!m) throw new UserError('Integrante não encontrado');
+    await logActivity(ctx, 'viewed', 'member_docs', memberId, `Documentos de ${m.name} (${artist.name}) visualizados`);
+    return { data: { rg: decryptField(m.documentRg), cpf: decryptField(m.documentCpf), birthDate: m.birthDate?.toISOString().slice(0, 10) ?? null } };
   });
 }

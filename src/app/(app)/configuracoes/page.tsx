@@ -7,6 +7,8 @@ import type { Role } from '@/lib/domain';
 import { headers } from 'next/headers';
 import { AiIntegrationSection } from '@/components/settings/AiIntegrationSection';
 import { fmtDate } from '@/lib/format';
+import { PrivacySection } from '@/components/settings/PrivacySection';
+import { RETENTION } from '@/lib/legal';
 
 export const metadata = { title: 'Configurações' };
 
@@ -62,6 +64,9 @@ export default async function SettingsPage() {
           }))}
           logs={logs.map((l) => ({ id: l.id, at: l.createdAt.toISOString(), user: l.user?.name ?? null, tool: l.tool, ok: l.ok, summary: l.summary, personalData: l.personalData }))}
         />
+      </Box>
+      <Box sx={{ mt: 3, display: 'grid' }}>
+        <PrivacySection isAdmin={isAdmin} dpoName={org.dpoName} dpoEmail={org.dpoEmail} retention={RETENTION} />
       </Box>
     </>
   );

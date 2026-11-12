@@ -17,7 +17,8 @@
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && prisma db push --skip-generate && next build",
     "db:up": "docker compose up -d db",
-    "org:create": "tsx scripts/create-org.ts"
+    "org:create": "tsx scripts/create-org.ts",
+    "lgpd:encrypt": "tsx scripts/lgpd-encrypt.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

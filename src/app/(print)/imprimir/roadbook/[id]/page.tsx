@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
-import { requireContext } from '@/lib/tenant';
+import { can, requireContext } from '@/lib/tenant';
 import {
   DEAL_TYPE_LABEL, PAYMENT_TERMS_LABEL, SCHEDULE_KIND_LABEL, SHOW_CHECKLIST, hospitalityLabels,
   type DealType, type PaymentTerms, type ScheduleKind,
@@ -35,6 +35,8 @@ export default async function RoadbookPage({ params, searchParams }: { params: P
   const { valores } = await searchParams;
   const showMoney = valores === '1';
   const ctx = await requireContext();
+  // preferências/restrições podem ser dado sensível: só para quem produz (LGPD art. 11)
+  const canSeeRestrictions = can(ctx, 'PRODUCER');
   const exists = await prisma.show.findFirst({ where: { id, organizationId: ctx.org.id }, select: { id: true } });
   if (!exists) notFound();
 
@@ -201,7 +203,7 @@ export default async function RoadbookPage({ params, searchParams }: { params: P
               <thead><tr><th>Nome</th><th>Função</th><th>Telefone</th><th>Preferências / restrições</th></tr></thead>
               <tbody>
                 {show.artist.members.map((m) => (
-                  <tr key={m.id}><td><b>{m.name}</b></td><td>{m.role ?? '—'}</td><td>{m.phone ?? '—'}</td><td>{m.restrictions ?? '—'}</td></tr>
+                  <tr key={m.id}><td><b>{m.name}</b></td><td>{m.role ?? '—'}</td><td>{m.phone ?? '—'}</td><td>{canSeeRestrictions ? m.restrictions ?? '—' : 'restrito'}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -228,7 +230,7 @@ export default async function RoadbookPage({ params, searchParams }: { params: P
 
         <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#888', borderTop: '1px solid #E6E0D2', paddingTop: 6 }}>
           <span>{org.name} · Greenwaves OS</span>
-          <span>Gerado em {dayjs().format('DD/MM/YYYY HH:mm')} · distâncias aproximadas</span>
+          <span>Gerado em {dayjs().format('DD/MM/YYYY HH:mm')} · contém dados pessoais: uso restrito à produção (LGPD) · distâncias aproximadas</span>
         </div>
       </div>
     </>

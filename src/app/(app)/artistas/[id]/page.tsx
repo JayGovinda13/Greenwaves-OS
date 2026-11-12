@@ -17,6 +17,7 @@ import { ArtistTabs } from '@/components/artists/ArtistTabs';
 import { RoadmapButton } from '@/components/tour/RoadmapButton';
 import { checklistProgress } from '@/lib/queries';
 import { parseTechRider } from '@/lib/techRider';
+import { maskDoc } from '@/lib/crypto';
 
 export default async function ArtistPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ aba?: string }> }) {
   const { id } = await params;
@@ -104,8 +105,12 @@ export default async function ArtistPage({ params, searchParams }: { params: Pro
           }))}
           members={artist.members.map((m) => ({
             ...m,
-            documentRg: canSeeDocs ? m.documentRg : m.documentRg ? '•••••••' : null,
-            documentCpf: canSeeDocs ? m.documentCpf : m.documentCpf ? '•••.•••.•••-••' : null,
+            // LGPD: documentos nunca vão abertos para o navegador; a administração revela sob demanda (registrado)
+            documentRg: maskDoc(m.documentRg),
+            documentCpf: maskDoc(m.documentCpf),
+            birthDate: canSeeDocs ? m.birthDate : null,
+            // preferências/restrições podem ser dado sensível (saúde, religião): só para quem produz
+            restrictions: can(ctx, 'PRODUCER') ? m.restrictions : m.restrictions ? 'restrito' : null,
           }))}
           canEditMembers={can(ctx, 'PRODUCER')}
           canSeeDocs={canSeeDocs}

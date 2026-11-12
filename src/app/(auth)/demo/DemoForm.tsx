@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Alert from '@mui/material/Alert';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
@@ -16,6 +18,7 @@ const SIZES = ['1 a 3 artistas', '4 a 10 artistas', '11 a 25 artistas', 'Mais de
 export function DemoForm({ whatsapp, email }: { whatsapp: string | null; email: string | null }) {
   const [v, setV] = useState({ name: '', company: '', city: '', contact: '', size: SIZES[1]!, message: '' });
   const [error, setError] = useState<string | null>(null);
+  const [consent, setConsent] = useState(false);
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: e.target.value });
 
   const text = () =>
@@ -35,6 +38,10 @@ export function DemoForm({ whatsapp, email }: { whatsapp: string | null; email: 
   const valid = () => {
     if (!v.name.trim() || !v.company.trim() || !v.contact.trim()) {
       setError('Preencha nome, produtora e um contato (e-mail ou WhatsApp).');
+      return false;
+    }
+    if (!consent) {
+      setError('Para enviarmos o pedido, confirme que concorda com o uso dos seus dados para o contato.');
       return false;
     }
     setError(null);
@@ -70,6 +77,16 @@ export function DemoForm({ whatsapp, email }: { whatsapp: string | null; email: 
           {SIZES.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
         </TextField>
         <TextField label="Quer contar algo mais? (opcional)" multiline minRows={2} value={v.message} onChange={set('message')} />
+        <FormControlLabel
+          control={<Checkbox checked={consent} onChange={(e) => setConsent(e.target.checked)} />}
+          label={
+            <Typography variant="body2" color="text.secondary">
+              Concordo que meus dados sejam usados só para responder este pedido de demonstração. Eles não ficam salvos no sistema.{' '}
+              <Link href="/privacidade" target="_blank" style={{ color: 'inherit', fontWeight: 700 }}>Política de Privacidade</Link>
+            </Typography>
+          }
+          sx={{ alignItems: 'flex-start', '& .MuiCheckbox-root': { pt: 0.25 } }}
+        />
         {error && <Alert severity="error">{error}</Alert>}
         {noChannel && <Alert severity="info">O agendamento de demos ainda não está disponível. Tente novamente em breve.</Alert>}
         {whatsapp && (

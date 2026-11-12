@@ -98,6 +98,9 @@ function Sidebar({ org, onNavigate }: { org: Props['org']; onNavigate?: () => vo
           Fazendo rock doido desde 2023
         </Typography>
         <Typography sx={{ fontSize: 12, opacity: 0.7, mt: 0.5 }}>Plano {org.plan} · Greenwaves OS</Typography>
+        <Box component={Link} href="/privacidade" target="_blank" sx={{ display: 'inline-block', mt: 0.75, fontSize: 12, color: BRAND.lime, textDecoration: 'none', fontWeight: 700 }}>
+          Privacidade e LGPD
+        </Box>
       </Box>
     </Box>
   );
