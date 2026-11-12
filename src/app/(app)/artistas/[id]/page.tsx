@@ -16,9 +16,11 @@ import { nameFontSize } from '@/components/artists/nameSize';
 import { ArtistTabs } from '@/components/artists/ArtistTabs';
 import { RoadmapButton } from '@/components/tour/RoadmapButton';
 import { checklistProgress } from '@/lib/queries';
+import { parseTechRider } from '@/lib/techRider';
 
-export default async function ArtistPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ArtistPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ aba?: string }> }) {
   const { id } = await params;
+  const { aba } = await searchParams;
   const ctx = await requireContext();
   const artist = await prisma.artist.findFirst({
     where: { id, organizationId: ctx.org.id },
@@ -108,6 +110,8 @@ export default async function ArtistPage({ params }: { params: Promise<{ id: str
           canEditMembers={can(ctx, 'PRODUCER')}
           canSeeDocs={canSeeDocs}
           canDelete={can(ctx, 'OWNER')}
+          techRider={parseTechRider(artist.techRider)}
+          initialTab={aba === 'ficha' ? 3 : 0}
         />
       </Card>
     </>

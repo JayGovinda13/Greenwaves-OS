@@ -24,6 +24,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { F, FormSection } from '@/components/ui/FormSection';
 import { useFormAction } from '@/components/ui/useFormAction';
 import { dealLabel } from '@/components/shows/dealLabel';
+import { TechRiderPanel } from '@/components/techrider/TechRiderPanel';
+import type { TechRider } from '@/lib/techRider';
 
 interface ShowItem {
   id: string; date: string; city: string | null; state: string | null; venue: string | null; status: string;
@@ -68,10 +70,11 @@ function MemberDialog({ artistId, member, onClose, canSeeDocs }: { artistId: str
   );
 }
 
-export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDocs, canDelete }: {
+export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDocs, canDelete, techRider, initialTab = 0 }: {
   artistId: string; shows: ShowItem[]; members: Member[]; canEditMembers: boolean; canSeeDocs: boolean; canDelete: boolean;
+  techRider: TechRider | null; initialTab?: number;
 }) {
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(initialTab);
   const [editing, setEditing] = useState<Member | 'new' | null>(null);
   const today = dayjs().format('YYYY-MM-DD');
   const upcoming = shows.filter((s) => s.date.slice(0, 10) >= today);
@@ -113,6 +116,7 @@ export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDoc
           <Tab label={`Próximos shows (${upcoming.length})`} />
           <Tab label={`Histórico (${past.length})`} />
           <Tab label={`Integrantes (${members.length})`} />
+          <Tab label="Ficha técnica & mapa de palco" />
         </Tabs>
         {tab === 2 && canEditMembers && (
           <Button size="small" startIcon={<Plus />} onClick={() => setEditing('new')}>Integrante</Button>
@@ -153,6 +157,9 @@ export function ArtistTabs({ artistId, shows, members, canEditMembers, canSeeDoc
             </Box>
           </Box>
         ))}
+      {tab === 3 && (
+        <TechRiderPanel artistId={artistId} initial={techRider} members={members.map((m) => ({ name: m.name, role: m.role }))} canEdit={canEditMembers} />
+      )}
       {canDelete && (
         <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', display: 'flex', justifyContent: 'flex-end' }}>
           <ConfirmButton

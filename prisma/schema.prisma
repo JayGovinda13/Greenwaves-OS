@@ -85,6 +85,7 @@ model Artist {
   baseFee           Int? // cachê de referência (centavos)
   hospitalityLocal  String? // contrapartidas padrão na própria UF (códigos separados por vírgula)
   hospitalityTravel String? // contrapartidas padrão quando viaja para outra UF
+  techRider         Json? // modelo de ficha técnica do artista (ver src/lib/techRider.ts)
   accent            String   @default("green") // green | lime | cream (estilo do card)
   active            Boolean  @default(true)
   createdAt         DateTime @default(now())
@@ -145,22 +146,25 @@ model Contact {
 }
 
 model Show {
-  id             String   @id @default(cuid())
-  organizationId String
-  artistId       String
-  contactId      String?
-  ownerId        String?
-  date           DateTime
-  city           String?
-  state          String?
-  venue          String?
-  venueUrl       String? // link do mapa da casa
-  venueAddress   String? // endereço da casa (roadbook)
-  lodgingName    String? // hotel/hospedagem
-  lodgingAddress String?
-  eventName      String?
-  status         String   @default("CONFIRMED") // PROSPECT | NEGOTIATING | CONFIRMED | DONE | CANCELED
-  contactName    String? // contato livre quando não há Contact cadastrado
+  id               String   @id @default(cuid())
+  organizationId   String
+  artistId         String
+  contactId        String?
+  ownerId          String?
+  date             DateTime
+  city             String?
+  state            String?
+  venue            String?
+  venueUrl         String? // link do mapa da casa
+  venueAddress     String? // endereço da casa (roadbook)
+  lodgingName      String? // hotel/hospedagem
+  lodgingAddress   String?
+  techRider        Json? // ficha técnica personalizada para este show (null = usa o modelo do artista)
+  venueTechContact String? // técnico de som / contato técnico da casa
+  techNotes        String? // observações técnicas deste show
+  eventName        String?
+  status           String   @default("CONFIRMED") // PROSPECT | NEGOTIATING | CONFIRMED | DONE | CANCELED
+  contactName      String? // contato livre quando não há Contact cadastrado
 
   // Combinado (deal)
   dealType         String    @default("FIXED") // FIXED | DOOR | GUARANTEE_OR_DOOR | FREE | TBD

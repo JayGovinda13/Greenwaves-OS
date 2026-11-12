@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { can, logActivity, requireRole } from '@/lib/tenant';
 import { formToObject, runAction, UserError } from '@/lib/action';
 import { artistSchema, memberSchema } from '@/lib/domain';
+import { techRiderSchema } from '@/lib/techRider';
 import { slugify, toCalendarDate } from '@/lib/format';
 
 export async function saveArtist(id: string | null, fd: FormData) {
@@ -73,5 +74,18 @@ export async function deleteMember(artistId: string, memberId: string) {
     await prisma.artistMember.deleteMany({ where: { id: memberId, artistId } });
     revalidatePath(`/artistas/${artistId}`);
     return { message: 'Integrante removido.' };
+  });
+}
+
+/** Salva o modelo de ficha técnica (e mapa de palco) do artista. */
+export async function saveArtistTechRider(artistId: string, data: unknown) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    const artist = await ownedArtist(ctx.org.id, artistId);
+    const rider = techRiderSchema.parse(data);
+    await prisma.artist.update({ where: { id: artistId }, data: { techRider: rider } });
+    await logActivity(ctx, 'updated', 'artist', artistId, `Ficha técnica de ${artist.name}`);
+    revalidatePath(`/artistas/${artistId}`);
+    return { message: 'Ficha técnica salva.' };
   });
 }

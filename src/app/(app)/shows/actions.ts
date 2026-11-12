@@ -7,6 +7,8 @@ import { formToObject, runAction, UserError } from '@/lib/action';
 import { SHOW_CHECKLIST, SHOW_STATUS, scheduleItemSchema, showSchema, ticketReportSchema, type ChecklistKey, type ShowStatus } from '@/lib/domain';
 import { syncShowReceivable } from '@/lib/receivables';
 import { defaultSchedule, legToShow } from '@/lib/tour';
+import { techRiderSchema } from '@/lib/techRider';
+import { Prisma } from '@prisma/client';
 import { fmtDate, toCalendarDate } from '@/lib/format';
 
 async function assertOwned(orgId: string, artistId: string, contactId: string | null) {
@@ -161,5 +163,32 @@ export async function generateSchedule(showId: string) {
     await logActivity(ctx, 'updated', 'show', showId, 'Roteiro do dia gerado');
     revalidatePath(`/shows/${showId}`);
     return { message: 'Roteiro padrão criado: ajuste os horários.' };
+  });
+}
+
+// ---------- Ficha técnica do show ----------
+/** Personaliza a ficha técnica só para este show (null = volta a usar o modelo do artista). */
+export async function saveShowTechRider(showId: string, data: unknown | null) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    await ownedShow(ctx.org.id, showId);
+    const rider = data === null ? Prisma.DbNull : techRiderSchema.parse(data);
+    await prisma.show.update({ where: { id: showId }, data: { techRider: rider } });
+    revalidatePath(`/shows/${showId}`);
+    return { message: data === null ? 'Ficha voltou a seguir o modelo do artista.' : 'Ficha técnica deste show salva.' };
+  });
+}
+
+export async function saveShowTechInfo(showId: string, fd: FormData) {
+  return runAction(async () => {
+    const ctx = await requireRole('PRODUCER');
+    await ownedShow(ctx.org.id, showId);
+    const v = formToObject(fd);
+    await prisma.show.update({
+      where: { id: showId },
+      data: { venueTechContact: v.venueTechContact?.trim().slice(0, 300) || null, techNotes: v.techNotes?.trim().slice(0, 2000) || null },
+    });
+    revalidatePath(`/shows/${showId}`);
+    return { message: 'Informações técnicas salvas.' };
   });
 }

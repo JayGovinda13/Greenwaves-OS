@@ -12,6 +12,8 @@ import { artistOptions, contactOptions } from '@/lib/queries';
 import { DEAL_TYPE_LABEL, PAYMENT_TERMS_LABEL, TX_CATEGORY_LABEL, hospitalityLabels, type DealType, type PaymentTerms, type TxCategory } from '@/lib/domain';
 import { TicketSalesCard } from '@/components/shows/TicketSalesCard';
 import { ScheduleCard } from '@/components/shows/ScheduleCard';
+import { ShowTechRiderCard } from '@/components/techrider/ShowTechRiderCard';
+import { parseTechRider } from '@/lib/techRider';
 import { dayjs, fmtDate, isUrl, money } from '@/lib/format';
 import { ResourceLink } from '@/components/ui/ResourceLink';
 import { TxStatusChip } from '@/components/ui/StatusChip';
@@ -209,6 +211,15 @@ export default async function ShowPage({ params }: { params: Promise<{ id: strin
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <ShowTechRiderCard
+            showId={show.id}
+            artistId={show.artist.id}
+            artistRider={parseTechRider(show.artist.techRider)}
+            showRider={parseTechRider(show.techRider)}
+            venueTechContact={show.venueTechContact}
+            techNotes={show.techNotes}
+            canEdit={can(ctx, 'PRODUCER')}
+          />
           <ShowChecklist show={show} canEdit={can(ctx, 'PRODUCER')} />
           <Card sx={{ p: 3 }}>
             <Typography variant="h5" mb={2}>Contratante</Typography>
